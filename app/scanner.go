@@ -290,14 +290,14 @@ func (s *ScannerImpl) reset(source string) {
 	s.currIdx = 0
 }
 
-func (s *ScannerImpl) Scan(source string) error {
+func (s *ScannerImpl) Scan(source string) ([]*Token, error) {
 	s.reset(source)
 	for s.hasNext() {
 		s.startIdx = s.currIdx
 		if err := s.scanToken(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	s.emitEOF()
-	return nil
+	return s.tokens, nil
 }
