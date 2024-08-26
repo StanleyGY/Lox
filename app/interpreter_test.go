@@ -99,9 +99,11 @@ func TestInterpreter(t *testing.T) {
 
 	t.Run("Test evaluating assign expr", func(t *testing.T) {
 		p := &Interpreter{
-			Bindings: make(map[string]interface{}),
+			Env: &Environment{
+				Bindings: make(map[string]interface{}),
+			},
 		}
-		p.Bindings["var"] = 1
+		p.Env.Bindings["var"] = 1
 
 		_, err := p.EvaluateExpr(&AssignExpr{
 			Name:  &Token{Lexeme: "badvar"},
@@ -113,6 +115,6 @@ func TestInterpreter(t *testing.T) {
 			Name:  &Token{Lexeme: "var"},
 			Value: &LiteralExpr{Value: 3},
 		})
-		assert.Equal(t, 3, p.Bindings["var"])
+		assert.Equal(t, 3, p.Env.Bindings["var"])
 	})
 }

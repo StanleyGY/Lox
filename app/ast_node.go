@@ -33,6 +33,14 @@ func (e *VarDeclStmt) Accept(v Visitor) error {
 	return v.VisitVarDeclStmt(e)
 }
 
+type BlockStmt struct {
+	Stmts []Stmt
+}
+
+func (e *BlockStmt) Accept(v Visitor) error {
+	return v.VisitBlockStmt(e)
+}
+
 type BinaryExpr struct {
 	Operator *Token
 	Left     Expr
@@ -89,6 +97,7 @@ type Visitor interface {
 	VisitInlineExprStmt(stmt *InlineExprStmt) error
 	VisitPrintStmt(stmt *PrintStmt) error
 	VisitVarDeclStmt(stmt *VarDeclStmt) error
+	VisitBlockStmt(stmt *BlockStmt) error
 
 	VisitBinaryExpr(expr *BinaryExpr) (interface{}, error)
 	VisitUnaryExpr(expr *UnaryExpr) (interface{}, error)

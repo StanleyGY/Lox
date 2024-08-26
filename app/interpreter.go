@@ -27,13 +27,44 @@ func (e RuntimeTypeError) Error() string {
 	return buffer.String()
 }
 
+type Environment struct {
+	ParentEnv *Environment
+	Bindings  map[string]interface{}
+}
+
+func (e Environment) FindBinding(name string) (interface{}, bool) {
+	val, ok := e.Bindings[name]
+	if ok {
+		return val, true
+	}
+	if e.ParentEnv == nil {
+		return nil, false
+	}
+	return e.ParentEnv.FindBinding(name)
+}
+
 type Interpreter struct {
-	Bindings map[string]interface{}
+	Env *Environment
+}
+
+func (p *Interpreter) createEnv() {
+	if p.Env == nil {
+		p.Env = &Environment{Bindings: make(map[string]interface{})}
+	} else {
+		newEnv := &Environment{
+			ParentEnv: p.Env,
+			Bindings:  make(map[string]interface{}),
+		}
+		p.Env = newEnv
+	}
+}
+
+func (p *Interpreter) restoreEnv() {
+	p.Env = p.Env.ParentEnv
 }
 
 func (p *Interpreter) Evaluate(stmts []Stmt) error {
-	p.Bindings = make(map[string]interface{})
-
+	p.createEnv()
 	for _, stmt := range stmts {
 		if err := stmt.Accept(p); err != nil {
 			return err
@@ -86,6 +117,17 @@ func (p *Interpreter) checkTypes(op *Token, vals []interface{}, expectedTypes []
 	return RuntimeTypeError{Operator: op, Vals: vals}
 }
 
+func (p *Interpreter) VisitBlockStmt(stmt *BlockStmt) error {
+	p.createEnv()
+	for _, c := range stmt.Stmts {
+		if err := c.Accept(p); err != nil {
+			return err
+		}
+	}
+	p.restoreEnv()
+	return nil
+}
+
 func (p *Interpreter) VisitInlineExprStmt(stmt *InlineExprStmt) error {
 	_, err := stmt.Child.Accept(p)
 	return err
@@ -109,7 +151,7 @@ func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 	if val, err = stmt.Initializer.Accept(p); err != nil {
 		return err
 	}
-	p.Bindings[stmt.Name.Lexeme] = val
+	p.Env.Bindings[stmt.Name.Lexeme] = val
 	return nil
 }
 
@@ -219,12 +261,14 @@ func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 		return nil, err
 	}
 
-	_, ok := p.Bindings[expr.Name.Lexeme]
+	// Design choice: the variable must be defined in the current scope
+	// before assigning another value
+	_, ok := p.Env.Bindings[expr.Name.Lexeme]
 	if !ok {
 		return nil, fmt.Errorf("assigns value to an undefined variable: %s", expr.Name.Lexeme)
 	}
 
-	p.Bindings[expr.Name.Lexeme] = val
+	p.Env.Bindings[expr.Name.Lexeme] = val
 	return nil, nil
 }
 
@@ -233,7 +277,9 @@ func (p *Interpreter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
 }
 
 func (p *Interpreter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
-	val, ok := p.Bindings[expr.Name.Lexeme]
+	// Design choice: when reading the value of a variable, we can walk back
+	// to the outer scopes
+	val, ok := p.Env.FindBinding(expr.Name.Lexeme)
 	if !ok {
 		return nil, fmt.Errorf("reference an undefined variable: %s", expr.Name.Lexeme)
 	}

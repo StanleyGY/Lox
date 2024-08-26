@@ -1,0 +1,18 @@
+var a = "a1";
+var b = "b1";
+{
+    var a = "a2";
+    var c = b;
+    {
+        var a = "a3";
+        var d = b + a;
+        print a;  // a3
+        print d;  // b1a3
+
+        d = d + a;
+        print d; // b1a3a3
+    }
+    print a;  // a2
+    print c;  // b1
+}
+print a; // a1

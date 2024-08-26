@@ -9,7 +9,9 @@ import (
 Use right-associative notations:
 
 	program        → statement* EOF
-	statement      → exprStmt | printStmt | varDeclStmt
+	statement      → exprStmt | printStmt | varDeclStmt | block
+	block 		   → "{" statement* "}"
+
 	exprStmt       → expression ";"
 	printStmt      → "print" expression ";"
 	varDeclStmt    → "var" IDENTIFIER ("=" EXPRESSION)? ";"
@@ -82,6 +84,10 @@ func (p *RDParser) advance() {
 	p.currIdx += 1
 }
 
+func (p *RDParser) hasNext() bool {
+	return p.currIdx < len(p.tokens)
+}
+
 // advanceIfMatch checks if current token matches any of `tokenTypes`.
 // If yes, return the current token, and advance to the next token
 func (p *RDParser) advanceIfMatch(tokenTypes ...int) bool {
@@ -100,6 +106,9 @@ func (p *RDParser) statement() (Stmt, error) {
 	}
 	if p.advanceIfMatch(Var) {
 		return p.varDeclStatement()
+	}
+	if p.advanceIfMatch(LeftBrace) {
+		return p.blockStatement()
 	}
 	return p.expressionStatement()
 }
@@ -149,6 +158,23 @@ func (p *RDParser) varDeclStatement() (Stmt, error) {
 		return nil, errorStmtMissingSemiColon
 	}
 	return &VarDeclStmt{Name: name, Initializer: initializer}, nil
+}
+
+func (p *RDParser) blockStatement() (Stmt, error) {
+	var stmts []Stmt
+	for p.hasNext() && !p.match(RightBrace) {
+		var stmt Stmt
+		var err error
+
+		if stmt, err = p.statement(); err != nil {
+			return nil, err
+		}
+		stmts = append(stmts, stmt)
+	}
+	if !p.advanceIfMatch(RightBrace) {
+		return nil, errors.New("block missing \"}\"")
+	}
+	return &BlockStmt{Stmts: stmts}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {
