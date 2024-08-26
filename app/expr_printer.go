@@ -30,19 +30,22 @@ func (p *AstPrinter) parenthesis(name string, exprs ...Expr) {
 	p.buf.WriteString(")")
 }
 
-func (p *AstPrinter) VisitBinaryExpr(expr *BinaryExpr) {
+func (p *AstPrinter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {
 	p.parenthesis(expr.Operator.Lexeme, expr.Left, expr.Right)
+	return nil, nil
 }
 
-func (p *AstPrinter) VisitUnaryExpr(expr *UnaryExpr) {
+func (p *AstPrinter) VisitUnaryExpr(expr *UnaryExpr) (interface{}, error) {
 	p.parenthesis(expr.Operator.Lexeme, expr.Right)
+	return nil, nil
 }
 
-func (p *AstPrinter) VisitGroupingExpr(expr *GroupingExpr) {
+func (p *AstPrinter) VisitGroupingExpr(expr *GroupingExpr) (interface{}, error) {
 	p.parenthesis("Group", expr.Child)
+	return nil, nil
 }
 
-func (p *AstPrinter) VisitLiteralExpr(expr *LiteralExpr) {
+func (p *AstPrinter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
 	switch expr.Value.(type) {
 	case string:
 		p.buf.WriteString(fmt.Sprintf("\"%s\"", expr.Value.(string)))
@@ -58,4 +61,5 @@ func (p *AstPrinter) VisitLiteralExpr(expr *LiteralExpr) {
 			p.buf.WriteString("nil")
 		}
 	}
+	return nil, nil
 }
