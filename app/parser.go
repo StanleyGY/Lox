@@ -1,19 +1,28 @@
 package main
 
-import "errors"
+import (
+	"errors"
+)
 
 /*
 Use right-associative notations:
-expression     → equality ;
-equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-term           → factor ( ( "-" | "+" ) factor )* ;
-factor         → unary ( ( "/" | "*" ) unary )* ;
-unary          → ( "!" | "-" ) unary | primary ;
-primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+
+	program        → statement* EOF ;
+	statement      → exprStmt | printStmt ;
+	exprStmt       → expression ";" ;
+	printStmt      → "print" expression ";" ;
+
+	expression     → equality ;
+	equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+	comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+	term           → factor ( ( "-" | "+" ) factor )* ;
+	factor         → unary ( ( "/" | "*" ) unary )* ;
+	unary          → ( "!" | "-" ) unary | primary ;
+	primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
 */
+
 type Parser interface {
-	Parse(tokens []*Token) Expr
+	Parse(tokens []*Token) []Stmt
 }
 
 type RDParser struct {
@@ -21,19 +30,26 @@ type RDParser struct {
 	currIdx int
 }
 
-func (p *RDParser) Parse(tokens []*Token) (Expr, error) {
-	var expr Expr
+func (p *RDParser) Parse(tokens []*Token) ([]Stmt, error) {
+	var stmts []Stmt
 	var err error
 
 	p.tokens = tokens
 	p.currIdx = 0
-	if expr, err = p.expression(); err != nil {
-		return nil, err
+
+	for p.currIdx < len(p.tokens) {
+		var stmt Stmt
+
+		if p.match(EOF) {
+			// TODO: what's the use for EOF?
+			break
+		}
+		if stmt, err = p.statement(); err != nil {
+			return nil, err
+		}
+		stmts = append(stmts, stmt)
 	}
-	if p.currIdx < len(p.tokens) {
-		return nil, errors.New("unused tokens")
-	}
-	return expr, nil
+	return stmts, nil
 }
 
 func (p *RDParser) peek() *Token {
@@ -69,6 +85,39 @@ func (p *RDParser) advanceIfMatch(tokenTypes ...int) bool {
 		}
 	}
 	return false
+}
+
+func (p *RDParser) statement() (Stmt, error) {
+	if p.advanceIfMatch(Print) {
+		return p.printStatement()
+	}
+	return p.expressionStatement()
+}
+
+func (p *RDParser) printStatement() (Stmt, error) {
+	var expr Expr
+	var err error
+
+	if expr, err = p.expression(); err != nil {
+		return nil, err
+	}
+	if !p.advanceIfMatch(SemiColon) {
+		return nil, errors.New("statement missing semicolon")
+	}
+	return &PrintStmt{Child: expr}, nil
+}
+
+func (p *RDParser) expressionStatement() (Stmt, error) {
+	var expr Expr
+	var err error
+
+	if expr, err = p.expression(); err != nil {
+		return nil, err
+	}
+	if !p.advanceIfMatch(SemiColon) {
+		return nil, errors.New("statement missing semicolon")
+	}
+	return &InlineExprStmt{Child: expr}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {

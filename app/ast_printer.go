@@ -11,9 +11,15 @@ type AstPrinter struct {
 	buf bytes.Buffer
 }
 
-func (p *AstPrinter) PrettyPrint(expr Expr) string {
+func (p *AstPrinter) PrettyPrintExpr(expr Expr) string {
 	p.buf.Reset()
 	expr.Accept(p)
+	return p.buf.String()
+}
+
+func (p *AstPrinter) PrettyPrintStmt(stmt Stmt) string {
+	p.buf.Reset()
+	stmt.Accept(p)
 	return p.buf.String()
 }
 
@@ -28,6 +34,16 @@ func (p *AstPrinter) parenthesis(name string, exprs ...Expr) {
 		}
 	}
 	p.buf.WriteString(")")
+}
+
+func (p *AstPrinter) VisitInlineExprStmt(stmt *InlineExprStmt) error {
+	stmt.Child.Accept(p)
+	return nil
+}
+
+func (p *AstPrinter) VisitPrintStmt(stmt *PrintStmt) error {
+	p.parenthesis("print", stmt.Child)
+	return nil
 }
 
 func (p *AstPrinter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {

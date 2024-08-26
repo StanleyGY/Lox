@@ -1,7 +1,27 @@
 package main
 
+type Stmt interface {
+	Accept(v Visitor) error
+}
+
 type Expr interface {
 	Accept(v Visitor) (interface{}, error)
+}
+
+type InlineExprStmt struct {
+	Child Expr
+}
+
+func (e *InlineExprStmt) Accept(v Visitor) error {
+	return v.VisitInlineExprStmt(e)
+}
+
+type PrintStmt struct {
+	Child Expr
+}
+
+func (e *PrintStmt) Accept(v Visitor) error {
+	return v.VisitPrintStmt(e)
 }
 
 type BinaryExpr struct {
@@ -40,6 +60,9 @@ func (e *LiteralExpr) Accept(v Visitor) (interface{}, error) {
 }
 
 type Visitor interface {
+	VisitInlineExprStmt(stmt *InlineExprStmt) error
+	VisitPrintStmt(stmt *PrintStmt) error
+
 	VisitBinaryExpr(expr *BinaryExpr) (interface{}, error)
 	VisitUnaryExpr(expr *UnaryExpr) (interface{}, error)
 	VisitGroupingExpr(expr *GroupingExpr) (interface{}, error)

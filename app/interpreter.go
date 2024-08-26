@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -29,7 +30,16 @@ func (e RuntimeTypeError) Error() string {
 type Interpreter struct {
 }
 
-func (p *Interpreter) Evaluate(expr Expr) (interface{}, error) {
+func (p *Interpreter) Evaluate(stmts []Stmt) error {
+	for _, stmt := range stmts {
+		if err := stmt.Accept(p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *Interpreter) EvaluateExpr(expr Expr) (interface{}, error) {
 	return expr.Accept(p)
 }
 
@@ -71,6 +81,22 @@ func (p *Interpreter) checkTypes(op *Token, vals []interface{}, expectedTypes []
 		}
 	}
 	return RuntimeTypeError{Operator: op, Vals: vals}
+}
+
+func (p *Interpreter) VisitInlineExprStmt(expr *InlineExprStmt) error {
+	_, err := expr.Child.Accept(p)
+	return err
+}
+
+func (p *Interpreter) VisitPrintStmt(expr *PrintStmt) error {
+	var val interface{}
+	var err error
+
+	if val, err = expr.Child.Accept(p); err != nil {
+		return err
+	}
+	fmt.Println(val)
+	return nil
 }
 
 func (p *Interpreter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {

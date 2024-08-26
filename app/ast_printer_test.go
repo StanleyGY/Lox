@@ -20,6 +20,6 @@ func TestExprPrinter(t *testing.T) {
 		},
 	}
 	printer := &AstPrinter{}
-	res := printer.PrettyPrint(expr)
+	res := printer.PrettyPrintExpr(expr)
 	assert.Equal(t, "(+ 1 2)", res)
 }
