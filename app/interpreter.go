@@ -117,6 +117,18 @@ func (p *Interpreter) checkTypes(op *Token, vals []interface{}, expectedTypes []
 	return RuntimeTypeError{Operator: op, Vals: vals}
 }
 
+func (p *Interpreter) VisitIfStmt(stmt *IfStmt) error {
+	var r interface{}
+	var err error
+	if r, err = stmt.Condition.Accept(p); err != nil {
+		return err
+	}
+	if p.isTruthy(r) {
+		return stmt.ThenBranch.Accept(p)
+	}
+	return stmt.ElseBranch.Accept(p)
+}
+
 func (p *Interpreter) VisitBlockStmt(stmt *BlockStmt) error {
 	p.createEnv()
 	for _, c := range stmt.Stmts {

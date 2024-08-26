@@ -9,15 +9,16 @@ import (
 Use right-associative notations:
 
 	program        → statement* EOF
-	statement      → exprStmt | printStmt | varDeclStmt | block
+	statement      → block | exprStmt | printStmt | varDeclStmt | ifStmt
 	block 		   → "{" statement* "}"
 
 	exprStmt       → expression ";"
 	printStmt      → "print" expression ";"
 	varDeclStmt    → "var" IDENTIFIER ("=" EXPRESSION)? ";"
+	ifStmt		   → "if" "(" expression ")" statement ( "else" statement )?
 
 	expression     → assignment
-	assignment     → IDENTIFIER "=" assignment | equality
+	assignment     → lvalue "=" assignment | equality
 	equality       → comparison ( ( "!=" | "==" ) comparison )*
 	comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )*
 	term           → factor ( ( "-" | "+" ) factor )*
@@ -110,6 +111,9 @@ func (p *RDParser) statement() (Stmt, error) {
 	if p.advanceIfMatch(LeftBrace) {
 		return p.blockStatement()
 	}
+	if p.advanceIfMatch(If) {
+		return p.ifStatement()
+	}
 	return p.expressionStatement()
 }
 
@@ -175,6 +179,35 @@ func (p *RDParser) blockStatement() (Stmt, error) {
 		return nil, errors.New("block missing \"}\"")
 	}
 	return &BlockStmt{Stmts: stmts}, nil
+}
+
+func (p *RDParser) ifStatement() (Stmt, error) {
+	var condition Expr
+	var thenBranch Stmt
+	var elseBranch Stmt
+	var err error
+
+	if !p.advanceIfMatch(LeftParen) {
+		return nil, errors.New("if statement missing left parenthesis")
+	}
+	if condition, err = p.expression(); err != nil {
+		return nil, err
+	}
+	if !p.advanceIfMatch(RightParen) {
+		return nil, errors.New("if statement missing right parenthesis")
+	}
+	if thenBranch, err = p.statement(); err != nil {
+		return nil, err
+	}
+
+	// In case of the "dangling else" problem (i.e. if A if B else C), the "else" statement
+	// is bounded to the nearest "if" statement
+	if p.advanceIfMatch(Else) {
+		if elseBranch, err = p.statement(); err != nil {
+			return nil, err
+		}
+	}
+	return &IfStmt{Condition: condition, ThenBranch: thenBranch, ElseBranch: elseBranch}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {

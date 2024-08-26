@@ -33,6 +33,16 @@ func (e *VarDeclStmt) Accept(v Visitor) error {
 	return v.VisitVarDeclStmt(e)
 }
 
+type IfStmt struct {
+	Condition  Expr
+	ThenBranch Stmt
+	ElseBranch Stmt
+}
+
+func (e *IfStmt) Accept(v Visitor) error {
+	return v.VisitIfStmt(e)
+}
+
 type BlockStmt struct {
 	Stmts []Stmt
 }
@@ -98,6 +108,7 @@ type Visitor interface {
 	VisitPrintStmt(stmt *PrintStmt) error
 	VisitVarDeclStmt(stmt *VarDeclStmt) error
 	VisitBlockStmt(stmt *BlockStmt) error
+	VisitIfStmt(stmt *IfStmt) error
 
 	VisitBinaryExpr(expr *BinaryExpr) (interface{}, error)
 	VisitUnaryExpr(expr *UnaryExpr) (interface{}, error)

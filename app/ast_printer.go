@@ -51,6 +51,16 @@ func (p *AstPrinter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 	return nil
 }
 
+func (p *AstPrinter) VisitIfStmt(stmt *IfStmt) error {
+	p.buf.WriteString("If")
+	stmt.Condition.Accept(p)
+	p.buf.WriteString("Then")
+	stmt.ThenBranch.Accept(p)
+	p.buf.WriteString("Else")
+	stmt.ElseBranch.Accept(p)
+	return nil
+}
+
 func (p *AstPrinter) VisitBlockStmt(stmt *BlockStmt) error {
 	for _, s := range stmt.Stmts {
 		s.Accept(p)
