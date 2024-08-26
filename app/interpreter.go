@@ -28,9 +28,12 @@ func (e RuntimeTypeError) Error() string {
 }
 
 type Interpreter struct {
+	Bindings map[string]interface{}
 }
 
 func (p *Interpreter) Evaluate(stmts []Stmt) error {
+	p.Bindings = make(map[string]interface{})
+
 	for _, stmt := range stmts {
 		if err := stmt.Accept(p); err != nil {
 			return err
@@ -83,20 +86,39 @@ func (p *Interpreter) checkTypes(op *Token, vals []interface{}, expectedTypes []
 	return RuntimeTypeError{Operator: op, Vals: vals}
 }
 
-func (p *Interpreter) VisitInlineExprStmt(expr *InlineExprStmt) error {
-	_, err := expr.Child.Accept(p)
+func (p *Interpreter) VisitInlineExprStmt(stmt *InlineExprStmt) error {
+	_, err := stmt.Child.Accept(p)
 	return err
 }
 
-func (p *Interpreter) VisitPrintStmt(expr *PrintStmt) error {
+func (p *Interpreter) VisitPrintStmt(stmt *PrintStmt) error {
 	var val interface{}
 	var err error
 
-	if val, err = expr.Child.Accept(p); err != nil {
+	if val, err = stmt.Child.Accept(p); err != nil {
 		return err
 	}
 	fmt.Println(val)
 	return nil
+}
+
+func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
+	var val interface{}
+	var err error
+
+	if val, err = stmt.Initializer.Accept(p); err != nil {
+		return err
+	}
+	p.Bindings[stmt.Name.Lexeme] = val
+	return nil
+}
+
+func (p *Interpreter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
+	val, ok := p.Bindings[expr.Name.Lexeme]
+	if !ok {
+		return nil, fmt.Errorf("reference an undefined variable: %s", expr.Name.Lexeme)
+	}
+	return val, nil
 }
 
 func (p *Interpreter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {

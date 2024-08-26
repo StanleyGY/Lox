@@ -2,23 +2,25 @@ package main
 
 import (
 	"errors"
+	"fmt"
 )
 
 /*
 Use right-associative notations:
 
-	program        → statement* EOF ;
-	statement      → exprStmt | printStmt ;
-	exprStmt       → expression ";" ;
-	printStmt      → "print" expression ";" ;
+	program        → statement* EOF
+	statement      → exprStmt | printStmt | varDecl
+	exprStmt       → expression ";"
+	printStmt      → "print" expression ";"
+	varDecl        → "var" IDENTIFIER ("=" EXPRESSION)? ";"
 
-	expression     → equality ;
-	equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-	comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-	term           → factor ( ( "-" | "+" ) factor )* ;
-	factor         → unary ( ( "/" | "*" ) unary )* ;
-	unary          → ( "!" | "-" ) unary | primary ;
-	primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+	expression     → equality
+	equality       → comparison ( ( "!=" | "==" ) comparison )*
+	comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )*
+	term           → factor ( ( "-" | "+" ) factor )*
+	factor         → unary ( ( "/" | "*" ) unary )*
+	unary          → ( "!" | "-" ) unary | primary
+	primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
 */
 
 type Parser interface {
@@ -29,6 +31,10 @@ type RDParser struct {
 	tokens  []*Token
 	currIdx int
 }
+
+var (
+	errorStmtMissingSemiColon = errors.New("statement missing semicolon")
+)
 
 func (p *RDParser) Parse(tokens []*Token) ([]Stmt, error) {
 	var stmts []Stmt
@@ -91,6 +97,9 @@ func (p *RDParser) statement() (Stmt, error) {
 	if p.advanceIfMatch(Print) {
 		return p.printStatement()
 	}
+	if p.advanceIfMatch(Var) {
+		return p.varDeclStatement()
+	}
 	return p.expressionStatement()
 }
 
@@ -102,7 +111,7 @@ func (p *RDParser) printStatement() (Stmt, error) {
 		return nil, err
 	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, errors.New("statement missing semicolon")
+		return nil, errorStmtMissingSemiColon
 	}
 	return &PrintStmt{Child: expr}, nil
 }
@@ -115,9 +124,30 @@ func (p *RDParser) expressionStatement() (Stmt, error) {
 		return nil, err
 	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, errors.New("statement missing semicolon")
+		return nil, errorStmtMissingSemiColon
 	}
 	return &InlineExprStmt{Child: expr}, nil
+}
+
+func (p *RDParser) varDeclStatement() (Stmt, error) {
+	var initializer Expr
+	var name *Token
+	var err error
+
+	if !p.advanceIfMatch(Identifier) {
+		return nil, errors.New("variable declaration missing identifier")
+	}
+	name = p.previous()
+
+	if p.advanceIfMatch(Equal) {
+		if initializer, err = p.expression(); err != nil {
+			return nil, err
+		}
+	}
+	if !p.advanceIfMatch(SemiColon) {
+		return nil, errorStmtMissingSemiColon
+	}
+	return &VarDeclStmt{Name: name, Initializer: initializer}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {
@@ -236,5 +266,8 @@ func (p *RDParser) primary() (Expr, error) {
 		p.advance()
 		return &GroupingExpr{Child: expr}, nil
 	}
-	return nil, errors.New("expect a valid expression")
+	if p.advanceIfMatch(Identifier) {
+		return &VariableExpr{Name: p.previous()}, nil
+	}
+	return nil, fmt.Errorf("expect a valid expression: %s", p.peek().Lexeme)
 }

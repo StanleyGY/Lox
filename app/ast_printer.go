@@ -46,6 +46,11 @@ func (p *AstPrinter) VisitPrintStmt(stmt *PrintStmt) error {
 	return nil
 }
 
+func (p *AstPrinter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
+	p.parenthesis("let", stmt.Initializer)
+	return nil
+}
+
 func (p *AstPrinter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {
 	p.parenthesis(expr.Operator.Lexeme, expr.Left, expr.Right)
 	return nil, nil
@@ -77,5 +82,10 @@ func (p *AstPrinter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
 			p.buf.WriteString("nil")
 		}
 	}
+	return nil, nil
+}
+
+func (p *AstPrinter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
+	p.buf.WriteString(expr.Name.Lexeme)
 	return nil, nil
 }
