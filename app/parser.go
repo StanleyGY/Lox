@@ -9,12 +9,13 @@ import (
 Use right-associative notations:
 
 	program        → statement* EOF
-	statement      → exprStmt | printStmt | varDecl
+	statement      → exprStmt | printStmt | varDeclStmt
 	exprStmt       → expression ";"
 	printStmt      → "print" expression ";"
-	varDecl        → "var" IDENTIFIER ("=" EXPRESSION)? ";"
+	varDeclStmt    → "var" IDENTIFIER ("=" EXPRESSION)? ";"
 
-	expression     → equality
+	expression     → assignment
+	assignment     → IDENTIFIER "=" assignment | equality
 	equality       → comparison ( ( "!=" | "==" ) comparison )*
 	comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )*
 	term           → factor ( ( "-" | "+" ) factor )*
@@ -151,7 +152,39 @@ func (p *RDParser) varDeclStatement() (Stmt, error) {
 }
 
 func (p *RDParser) expression() (Expr, error) {
-	return p.equality()
+	return p.assignment()
+}
+
+func (p *RDParser) assignment() (Expr, error) {
+	var name Expr
+	var value Expr
+	var err error
+
+	// If an "assignment" rule is satisfied by an assignment expression,
+	// The LHS of this expr is a l-value expr that evaluates to the storage location.
+	// The RHS of this expr is a r-value expr that evaluates to a value.
+	// A l-value expr happens to satisfy "equality" rule, so we can use "equality" rule to parse it
+	// and filter out the well-defined variants.
+	if name, err = p.equality(); err != nil {
+		return nil, err
+	}
+
+	// This is an equality expr
+	if !p.advanceIfMatch(Equal) {
+		return name, nil
+	}
+
+	// This expr should start with an identifier followed by equality
+	if value, err = p.assignment(); err != nil {
+		return nil, err
+	}
+
+	// TODO: support more l-value expr
+	varName, ok := name.(*VariableExpr)
+	if !ok {
+		return nil, fmt.Errorf("invalid assignment target")
+	}
+	return &AssignExpr{Name: varName.Name, Value: value}, nil
 }
 
 func (p *RDParser) equality() (Expr, error) {

@@ -61,6 +61,11 @@ func (p *AstPrinter) VisitUnaryExpr(expr *UnaryExpr) (interface{}, error) {
 	return nil, nil
 }
 
+func (p *AstPrinter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
+	p.parenthesis("let", &LiteralExpr{expr.Name}, expr.Value)
+	return nil, nil
+}
+
 func (p *AstPrinter) VisitGroupingExpr(expr *GroupingExpr) (interface{}, error) {
 	p.parenthesis("Group", expr.Child)
 	return nil, nil

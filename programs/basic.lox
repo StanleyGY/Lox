@@ -3,5 +3,8 @@ print "1" + "2";
 print true;
 print nil;
 print (5 > 6) == false;
+
 var myvar = "test";
+print myvar;
+myvar = "test2";
 print myvar;

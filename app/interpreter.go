@@ -113,14 +113,6 @@ func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 	return nil
 }
 
-func (p *Interpreter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
-	val, ok := p.Bindings[expr.Name.Lexeme]
-	if !ok {
-		return nil, fmt.Errorf("reference an undefined variable: %s", expr.Name.Lexeme)
-	}
-	return val, nil
-}
-
 func (p *Interpreter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {
 	var leftVal interface{}
 	var rightVal interface{}
@@ -219,6 +211,31 @@ func (p *Interpreter) VisitGroupingExpr(expr *GroupingExpr) (interface{}, error)
 	return expr.Child.Accept(p)
 }
 
+func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
+	var val interface{}
+	var err error
+
+	if val, err = expr.Value.Accept(p); err != nil {
+		return nil, err
+	}
+
+	_, ok := p.Bindings[expr.Name.Lexeme]
+	if !ok {
+		return nil, fmt.Errorf("assigns value to an undefined variable: %s", expr.Name.Lexeme)
+	}
+
+	p.Bindings[expr.Name.Lexeme] = val
+	return nil, nil
+}
+
 func (p *Interpreter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
 	return expr.Value, nil
+}
+
+func (p *Interpreter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
+	val, ok := p.Bindings[expr.Name.Lexeme]
+	if !ok {
+		return nil, fmt.Errorf("reference an undefined variable: %s", expr.Name.Lexeme)
+	}
+	return val, nil
 }

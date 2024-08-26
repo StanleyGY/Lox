@@ -76,6 +76,15 @@ func (e *VariableExpr) Accept(v Visitor) (interface{}, error) {
 	return v.VisitVariableExpr(e)
 }
 
+type AssignExpr struct {
+	Name  *Token
+	Value Expr
+}
+
+func (e *AssignExpr) Accept(v Visitor) (interface{}, error) {
+	return v.VisitAssignExpr(e)
+}
+
 type Visitor interface {
 	VisitInlineExprStmt(stmt *InlineExprStmt) error
 	VisitPrintStmt(stmt *PrintStmt) error
@@ -85,5 +94,6 @@ type Visitor interface {
 	VisitUnaryExpr(expr *UnaryExpr) (interface{}, error)
 	VisitGroupingExpr(expr *GroupingExpr) (interface{}, error)
 	VisitLiteralExpr(expr *LiteralExpr) (interface{}, error)
+	VisitAssignExpr(expr *AssignExpr) (interface{}, error)
 	VisitVariableExpr(expr *VariableExpr) (interface{}, error)
 }

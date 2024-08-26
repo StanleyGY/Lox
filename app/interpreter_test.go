@@ -96,4 +96,23 @@ func TestInterpreter(t *testing.T) {
 		})
 		assert.False(t, res.(bool))
 	})
+
+	t.Run("Test evaluating assign expr", func(t *testing.T) {
+		p := &Interpreter{
+			Bindings: make(map[string]interface{}),
+		}
+		p.Bindings["var"] = 1
+
+		_, err := p.EvaluateExpr(&AssignExpr{
+			Name:  &Token{Lexeme: "badvar"},
+			Value: &LiteralExpr{Value: 0},
+		})
+		assert.Error(t, err)
+
+		p.EvaluateExpr(&AssignExpr{
+			Name:  &Token{Lexeme: "var"},
+			Value: &LiteralExpr{Value: 3},
+		})
+		assert.Equal(t, 3, p.Bindings["var"])
+	})
 }
