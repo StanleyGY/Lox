@@ -240,6 +240,32 @@ func (p *Interpreter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {
 	return nil, RuntimeTypeError{Operator: expr.Operator, Vals: []interface{}{leftVal, rightVal}}
 }
 
+func (p *Interpreter) VisitLogicalExpr(expr *LogicExpr) (interface{}, error) {
+	var leftVal interface{}
+	var err error
+
+	if leftVal, err = expr.Left.Accept(p); err != nil {
+		return nil, err
+	}
+
+	// Logical operator will return a value that guarantees
+	// the truthness of this operator
+	switch expr.Operator.Type {
+	case And:
+		if !p.isTruthy(leftVal) {
+			return false, nil
+		}
+		return expr.Right.Accept(p)
+	case Or:
+		if p.isTruthy(leftVal) {
+			return leftVal, nil
+		}
+		return expr.Right.Accept(p)
+	}
+
+	return nil, RuntimeTypeError{Operator: expr.Operator, Vals: []interface{}{leftVal}}
+}
+
 func (p *Interpreter) VisitUnaryExpr(expr *UnaryExpr) (interface{}, error) {
 	var rightVal interface{}
 	var err error

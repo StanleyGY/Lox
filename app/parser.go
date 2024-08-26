@@ -18,7 +18,11 @@ Use right-associative notations:
 	ifStmt		   → "if" "(" expression ")" statement ( "else" statement )?
 
 	expression     → assignment
-	assignment     → lvalue "=" assignment | equality
+
+	assignment     → lvalue "=" assignment) | logic_or
+	logic_or	   → logic_and ( "or" logic_and )*
+	logic_and      → equality ( "and" equality )*
+
 	equality       → comparison ( ( "!=" | "==" ) comparison )*
 	comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )*
 	term           → factor ( ( "-" | "+" ) factor )*
@@ -222,18 +226,18 @@ func (p *RDParser) assignment() (Expr, error) {
 	// If an "assignment" rule is satisfied by an assignment expression,
 	// The LHS of this expr is a l-value expr that evaluates to the storage location.
 	// The RHS of this expr is a r-value expr that evaluates to a value.
-	// A l-value expr happens to satisfy "equality" rule, so we can use "equality" rule to parse it
+	// A l-value expr happens to satisfy "logicOr" rule, so we can use "logicOr" rule to parse it
 	// and filter out the well-defined variants.
-	if name, err = p.equality(); err != nil {
+	if name, err = p.logicOr(); err != nil {
 		return nil, err
 	}
 
-	// This is an equality expr
+	// This is an "logicOr" expr
 	if !p.advanceIfMatch(Equal) {
 		return name, nil
 	}
 
-	// This expr should start with an identifier followed by equality
+	// This expr should start with an identifier followed by "logicOr" expr
 	if value, err = p.assignment(); err != nil {
 		return nil, err
 	}
@@ -244,6 +248,42 @@ func (p *RDParser) assignment() (Expr, error) {
 		return nil, fmt.Errorf("invalid assignment target")
 	}
 	return &AssignExpr{Name: varName.Name, Value: value}, nil
+}
+
+func (p *RDParser) logicOr() (Expr, error) {
+	var left Expr
+	var right Expr
+	var err error
+
+	if left, err = p.logicAnd(); err != nil {
+		return nil, err
+	}
+	for p.advanceIfMatch(Or) {
+		op := p.previous()
+		if right, err = p.logicAnd(); err != nil {
+			return nil, err
+		}
+		left = &LogicExpr{Operator: op, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func (p *RDParser) logicAnd() (Expr, error) {
+	var left Expr
+	var right Expr
+	var err error
+
+	if left, err = p.equality(); err != nil {
+		return nil, err
+	}
+	for p.advanceIfMatch(And) {
+		op := p.previous()
+		if right, err = p.equality(); err != nil {
+			return nil, err
+		}
+		left = &LogicExpr{Operator: op, Left: left, Right: right}
+	}
+	return left, nil
 }
 
 func (p *RDParser) equality() (Expr, error) {

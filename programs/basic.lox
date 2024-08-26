@@ -8,3 +8,7 @@ var myvar = "test";
 print myvar;
 myvar = "test2";
 print myvar;
+
+print 5 > 0 and 3 < 0;
+print "hi" and 2;
+print 5 < 0 or nil or "test" or 2;

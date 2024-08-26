@@ -78,6 +78,11 @@ func (p *AstPrinter) VisitUnaryExpr(expr *UnaryExpr) (interface{}, error) {
 	return nil, nil
 }
 
+func (p *AstPrinter) VisitLogicalExpr(expr *LogicExpr) (interface{}, error) {
+	p.parenthesis(expr.Operator.Lexeme, expr.Left, expr.Right)
+	return nil, nil
+}
+
 func (p *AstPrinter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 	p.parenthesis("let", &LiteralExpr{expr.Name}, expr.Value)
 	return nil, nil

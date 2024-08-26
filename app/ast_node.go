@@ -61,6 +61,18 @@ func (e *BinaryExpr) Accept(v Visitor) (interface{}, error) {
 	return v.VisitBinaryExpr(e)
 }
 
+// LogicExpr differs from BinaryExpr in that it supports short-circuit
+// evaluation on its operands
+type LogicExpr struct {
+	Operator *Token
+	Left     Expr
+	Right    Expr
+}
+
+func (e *LogicExpr) Accept(v Visitor) (interface{}, error) {
+	return v.VisitLogicalExpr(e)
+}
+
 type UnaryExpr struct {
 	Operator *Token
 	Right    Expr
@@ -112,6 +124,7 @@ type Visitor interface {
 
 	VisitBinaryExpr(expr *BinaryExpr) (interface{}, error)
 	VisitUnaryExpr(expr *UnaryExpr) (interface{}, error)
+	VisitLogicalExpr(expr *LogicExpr) (interface{}, error)
 	VisitGroupingExpr(expr *GroupingExpr) (interface{}, error)
 	VisitLiteralExpr(expr *LiteralExpr) (interface{}, error)
 	VisitAssignExpr(expr *AssignExpr) (interface{}, error)
