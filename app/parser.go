@@ -1,25 +1,24 @@
 package main
 
 import (
-	"errors"
-	"fmt"
+	"bytes"
 )
 
 /*
 Use right-associative notations:
 
 	program        → statement* EOF
-	statement      → block | exprStmt | printStmt | varDeclStmt | ifStmt
-	block 		   → "{" statement* "}"
+	statement      → block | exprStmt | printStmt | varDecl | ifStmt
+	varDecl    → "var" IDENTIFIER ("=" EXPRESSION)? ";"
 
+	block 		   → "{" statement* "}"
 	exprStmt       → expression ";"
 	printStmt      → "print" expression ";"
-	varDeclStmt    → "var" IDENTIFIER ("=" EXPRESSION)? ";"
 	ifStmt		   → "if" "(" expression ")" statement ( "else" statement )?
+	forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) | expression? ";" expression? ")" statement ;
 	whileStmt      → "while" "(" expression ")" statement
 
 	expression     → assignment
-
 	assignment     → lvalue "=" assignment) | logic_or
 	logic_or	   → logic_and ( "or" logic_and )*
 	logic_and      → equality ( "and" equality )*
@@ -41,9 +40,34 @@ type RDParser struct {
 	currIdx int
 }
 
-var (
-	errorStmtMissingSemiColon = errors.New("statement missing semicolon")
-)
+type ParsingError struct {
+	Reason   string
+	TokenIdx int
+	Tokens   []*Token
+}
+
+func (e ParsingError) Error() string {
+	var buf bytes.Buffer
+	buf.WriteString("Parsing failed around lines: \n")
+	for i := max(0, e.TokenIdx-10); i <= min(e.TokenIdx+5, len(e.Tokens)-1); i++ {
+		buf.WriteString(e.Tokens[i].Lexeme)
+		buf.WriteString(" ")
+	}
+	buf.WriteString("\n")
+	for i := max(0, e.TokenIdx-10); i <= min(e.TokenIdx+5, len(e.Tokens)-1); i++ {
+		for j := 0; j < len(e.Tokens[i].Lexeme); j++ {
+			if i == e.TokenIdx && j <= len(e.Tokens[i].Lexeme)/2 {
+				buf.WriteString("^")
+			} else {
+				buf.WriteString(" ")
+			}
+		}
+		buf.WriteString(" ")
+	}
+	buf.WriteString("\nFailed reason: ")
+	buf.WriteString(e.Reason)
+	return buf.String()
+}
 
 func (p *RDParser) Parse(tokens []*Token) ([]Stmt, error) {
 	var stmts []Stmt
@@ -94,6 +118,10 @@ func (p *RDParser) hasNext() bool {
 	return p.currIdx < len(p.tokens)
 }
 
+func (p *RDParser) emitParsingError(reason string) error {
+	return &ParsingError{Reason: reason, TokenIdx: p.currIdx, Tokens: p.tokens}
+}
+
 // advanceIfMatch checks if current token matches any of `tokenTypes`.
 // If yes, return the current token, and advance to the next token
 func (p *RDParser) advanceIfMatch(tokenTypes ...int) bool {
@@ -122,6 +150,9 @@ func (p *RDParser) statement() (Stmt, error) {
 	if p.advanceIfMatch(While) {
 		return p.whileStatement()
 	}
+	if p.advanceIfMatch(For) {
+		return p.forStatement()
+	}
 	return p.expressionStatement()
 }
 
@@ -133,7 +164,7 @@ func (p *RDParser) printStatement() (Stmt, error) {
 		return nil, err
 	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, errorStmtMissingSemiColon
+		return nil, &ParsingError{Reason: "missing \";\"", TokenIdx: p.currIdx, Tokens: p.tokens}
 	}
 	return &PrintStmt{Child: expr}, nil
 }
@@ -146,7 +177,7 @@ func (p *RDParser) expressionStatement() (Stmt, error) {
 		return nil, err
 	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, errorStmtMissingSemiColon
+		return nil, p.emitParsingError("missing ;")
 	}
 	return &InlineExprStmt{Child: expr}, nil
 }
@@ -157,7 +188,7 @@ func (p *RDParser) varDeclStatement() (Stmt, error) {
 	var err error
 
 	if !p.advanceIfMatch(Identifier) {
-		return nil, errors.New("variable declaration missing identifier")
+		return nil, p.emitParsingError("variable declaration missing identifier")
 	}
 	name = p.previous()
 
@@ -167,7 +198,7 @@ func (p *RDParser) varDeclStatement() (Stmt, error) {
 		}
 	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, errorStmtMissingSemiColon
+		return nil, p.emitParsingError("missing ;")
 	}
 	return &VarDeclStmt{Name: name, Initializer: initializer}, nil
 }
@@ -184,7 +215,7 @@ func (p *RDParser) blockStatement() (Stmt, error) {
 		stmts = append(stmts, stmt)
 	}
 	if !p.advanceIfMatch(RightBrace) {
-		return nil, errors.New("block missing \"}\"")
+		return nil, p.emitParsingError("block missing \"}\"")
 	}
 	return &BlockStmt{Stmts: stmts}, nil
 }
@@ -196,13 +227,13 @@ func (p *RDParser) ifStatement() (Stmt, error) {
 	var err error
 
 	if !p.advanceIfMatch(LeftParen) {
-		return nil, errors.New("if statement missing left parenthesis")
+		return nil, p.emitParsingError("if condition missing \"{\"")
 	}
 	if condition, err = p.expression(); err != nil {
 		return nil, err
 	}
 	if !p.advanceIfMatch(RightParen) {
-		return nil, errors.New("if statement missing right parenthesis")
+		return nil, p.emitParsingError("if condition missing \"}\"")
 	}
 	if thenBranch, err = p.statement(); err != nil {
 		return nil, err
@@ -223,18 +254,78 @@ func (p *RDParser) whileStatement() (Stmt, error) {
 	var body Stmt
 	var err error
 	if !p.advanceIfMatch(LeftParen) {
-		return nil, errors.New("while statement missing left parenthesis")
+		return nil, p.emitParsingError("while loop missing \"{\"")
 	}
 	if condition, err = p.expression(); err != nil {
 		return nil, err
 	}
 	if !p.advanceIfMatch(RightParen) {
-		return nil, errors.New("while statement missing right parenthesis")
+		return nil, p.emitParsingError("while loop missing \"}\"")
 	}
 	if body, err = p.statement(); err != nil {
 		return nil, err
 	}
 	return &WhileStmt{Condition: condition, Body: body}, nil
+}
+
+func (p *RDParser) forStatement() (Stmt, error) {
+	var initializer Stmt
+	var condition Expr
+	var increment Expr
+	var body Stmt
+	var err error
+
+	if !p.advanceIfMatch(LeftParen) {
+		return nil, p.emitParsingError("for loop missing \"(\"")
+	}
+	// Initializer clause
+	if p.advanceIfMatch(Var) {
+		if initializer, err = p.varDeclStatement(); err != nil {
+			return nil, err
+		}
+	} else if !p.advanceIfMatch(SemiColon) {
+		if initializer, err = p.expressionStatement(); err != nil {
+			return nil, err
+		}
+	}
+	// Condition clause
+	if !p.advanceIfMatch(SemiColon) {
+		if condition, err = p.expression(); err != nil {
+			return nil, err
+		}
+		if !p.advanceIfMatch(SemiColon) {
+			return nil, p.emitParsingError("for loop condition clause missing \"'\"")
+		}
+	}
+	// Increment clause
+	if !p.advanceIfMatch(RightParen) {
+		if increment, err = p.expression(); err != nil {
+			return nil, err
+		}
+		if !p.advanceIfMatch(RightParen) {
+			return nil, p.emitParsingError("for loop condition clause missing \")\"")
+		}
+	}
+	// Body
+	if body, err = p.statement(); err != nil {
+		return nil, err
+	}
+
+	// C-style for-loop is just a syntactic sugar of a while-loop
+	// If condition is omitted, then it's default to true
+	if condition == nil {
+		condition = &LiteralExpr{Value: true}
+	}
+	if increment != nil {
+		body = &BlockStmt{Stmts: []Stmt{body, &InlineExprStmt{Child: increment}}}
+	}
+
+	whileStmt := &WhileStmt{Condition: condition, Body: body}
+
+	if initializer != nil {
+		return &BlockStmt{Stmts: []Stmt{initializer, whileStmt}}, nil
+	}
+	return whileStmt, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {
@@ -268,7 +359,7 @@ func (p *RDParser) assignment() (Expr, error) {
 	// TODO: support more l-value expr
 	varName, ok := name.(*VariableExpr)
 	if !ok {
-		return nil, fmt.Errorf("invalid assignment target")
+		return nil, p.emitParsingError("invalid assignment target")
 	}
 	return &AssignExpr{Name: varName.Name, Value: value}, nil
 }
@@ -416,7 +507,7 @@ func (p *RDParser) primary() (Expr, error) {
 			return nil, err
 		}
 		if !p.match(RightParen) {
-			return nil, errors.New("missing right parenthesis")
+			return nil, p.emitParsingError("grouping expr missing \")\"")
 		}
 		p.advance()
 		return &GroupingExpr{Child: expr}, nil
@@ -424,5 +515,5 @@ func (p *RDParser) primary() (Expr, error) {
 	if p.advanceIfMatch(Identifier) {
 		return &VariableExpr{Name: p.previous()}, nil
 	}
-	return nil, fmt.Errorf("expect a valid expression: %s", p.peek().Lexeme)
+	return nil, p.emitParsingError("expect a valid primary expr")
 }

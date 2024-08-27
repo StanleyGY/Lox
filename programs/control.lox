@@ -10,7 +10,14 @@ if (a > 0)
 else
     print "no branch";
 
+print "while loop:";
 while (a < 3) {
     print a;
     a = a + 1;
+}
+
+print "for loop:";
+for (var b = 1; b <= 2; b = b+1) {
+    print b;
+    var b = 3;  // this `b` has different scope from `b` in initializer clause
 }
