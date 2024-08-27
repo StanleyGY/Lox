@@ -32,6 +32,11 @@ type Environment struct {
 	Bindings  map[string]interface{}
 }
 
+// CreateBinding creates a binding in the current scope
+func (e Environment) CreateBinding(name string, val interface{}) {
+	e.Bindings[name] = val
+}
+
 func (e Environment) FindBinding(name string) (interface{}, bool) {
 	val, ok := e.Bindings[name]
 	if ok {
@@ -41,6 +46,21 @@ func (e Environment) FindBinding(name string) (interface{}, bool) {
 		return nil, false
 	}
 	return e.ParentEnv.FindBinding(name)
+}
+
+// UpdateBinding searches for a binding, starting from the nearest scope
+// and updates the value. If there's no binding in any scope, it returns
+// false.
+func (e Environment) UpdateBinding(name string, val interface{}) bool {
+	_, ok := e.Bindings[name]
+	if ok {
+		e.Bindings[name] = val
+		return true
+	}
+	if e.ParentEnv == nil {
+		return false
+	}
+	return e.ParentEnv.UpdateBinding(name, val)
 }
 
 type Interpreter struct {
@@ -129,6 +149,23 @@ func (p *Interpreter) VisitIfStmt(stmt *IfStmt) error {
 	return stmt.ElseBranch.Accept(p)
 }
 
+func (p *Interpreter) VisitWhileStmt(stmt *WhileStmt) error {
+	var r interface{}
+	var err error
+	for {
+		if r, err = stmt.Condition.Accept(p); err != nil {
+			return err
+		}
+		if !p.isTruthy(r) {
+			break
+		}
+		if err = stmt.Body.Accept(p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (p *Interpreter) VisitBlockStmt(stmt *BlockStmt) error {
 	p.createEnv()
 	for _, c := range stmt.Stmts {
@@ -163,7 +200,8 @@ func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 	if val, err = stmt.Initializer.Accept(p); err != nil {
 		return err
 	}
-	p.Env.Bindings[stmt.Name.Lexeme] = val
+
+	p.Env.CreateBinding(stmt.Name.Lexeme, val)
 	return nil
 }
 
@@ -301,12 +339,9 @@ func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 
 	// Design choice: the variable must be defined in the current scope
 	// before assigning another value
-	_, ok := p.Env.Bindings[expr.Name.Lexeme]
-	if !ok {
+	if !p.Env.UpdateBinding(expr.Name.Lexeme, val) {
 		return nil, fmt.Errorf("assigns value to an undefined variable: %s", expr.Name.Lexeme)
 	}
-
-	p.Env.Bindings[expr.Name.Lexeme] = val
 	return nil, nil
 }
 

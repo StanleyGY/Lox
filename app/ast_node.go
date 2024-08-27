@@ -43,6 +43,15 @@ func (e *IfStmt) Accept(v Visitor) error {
 	return v.VisitIfStmt(e)
 }
 
+type WhileStmt struct {
+	Condition Expr
+	Body      Stmt
+}
+
+func (e *WhileStmt) Accept(v Visitor) error {
+	return v.VisitWhileStmt(e)
+}
+
 type BlockStmt struct {
 	Stmts []Stmt
 }
@@ -121,6 +130,7 @@ type Visitor interface {
 	VisitVarDeclStmt(stmt *VarDeclStmt) error
 	VisitBlockStmt(stmt *BlockStmt) error
 	VisitIfStmt(stmt *IfStmt) error
+	VisitWhileStmt(stmt *WhileStmt) error
 
 	VisitBinaryExpr(expr *BinaryExpr) (interface{}, error)
 	VisitUnaryExpr(expr *UnaryExpr) (interface{}, error)

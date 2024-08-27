@@ -16,6 +16,7 @@ Use right-associative notations:
 	printStmt      → "print" expression ";"
 	varDeclStmt    → "var" IDENTIFIER ("=" EXPRESSION)? ";"
 	ifStmt		   → "if" "(" expression ")" statement ( "else" statement )?
+	whileStmt      → "while" "(" expression ")" statement
 
 	expression     → assignment
 
@@ -118,6 +119,9 @@ func (p *RDParser) statement() (Stmt, error) {
 	if p.advanceIfMatch(If) {
 		return p.ifStatement()
 	}
+	if p.advanceIfMatch(While) {
+		return p.whileStatement()
+	}
 	return p.expressionStatement()
 }
 
@@ -212,6 +216,25 @@ func (p *RDParser) ifStatement() (Stmt, error) {
 		}
 	}
 	return &IfStmt{Condition: condition, ThenBranch: thenBranch, ElseBranch: elseBranch}, nil
+}
+
+func (p *RDParser) whileStatement() (Stmt, error) {
+	var condition Expr
+	var body Stmt
+	var err error
+	if !p.advanceIfMatch(LeftParen) {
+		return nil, errors.New("while statement missing left parenthesis")
+	}
+	if condition, err = p.expression(); err != nil {
+		return nil, err
+	}
+	if !p.advanceIfMatch(RightParen) {
+		return nil, errors.New("while statement missing right parenthesis")
+	}
+	if body, err = p.statement(); err != nil {
+		return nil, err
+	}
+	return &WhileStmt{Condition: condition, Body: body}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {

@@ -61,6 +61,11 @@ func (p *AstPrinter) VisitIfStmt(stmt *IfStmt) error {
 	return nil
 }
 
+func (p *AstPrinter) VisitWhileStmt(stmt *WhileStmt) error {
+	// TODO: add ast printer
+	return nil
+}
+
 func (p *AstPrinter) VisitBlockStmt(stmt *BlockStmt) error {
 	for _, s := range stmt.Stmts {
 		s.Accept(p)

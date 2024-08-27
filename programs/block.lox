@@ -11,8 +11,10 @@ var b = "b1";
 
         d = d + a;
         print d; // b1a3a3
+
+        c = "c1";
     }
     print a;  // a2
-    print c;  // b1
+    print c;  // c1
 }
 print a; // a1
