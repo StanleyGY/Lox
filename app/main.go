@@ -32,8 +32,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Evaluate
 	interpreter := MakeInterpreter()
+
+	// Run resolver
+	resolver := MakeResolver(interpreter)
+	err = resolver.Resolve(stmts)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Run interpreter
 	err = interpreter.Evaluate(stmts)
 	if err != nil {
 		fmt.Println(err)

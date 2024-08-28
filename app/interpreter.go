@@ -54,7 +54,7 @@ type Environment struct {
 }
 
 // CreateBinding creates a new binding in the current scope
-func (e Environment) CreateBinding(name string, val interface{}) bool {
+func (e *Environment) CreateBinding(name string, val interface{}) bool {
 	if _, ok := e.Bindings[name]; ok {
 		return false
 	}
@@ -62,21 +62,19 @@ func (e Environment) CreateBinding(name string, val interface{}) bool {
 	return true
 }
 
-func (e Environment) FindBinding(name string) (interface{}, bool) {
-	val, ok := e.Bindings[name]
-	if ok {
-		return val, true
+func (e *Environment) FindBinding(name string, dist int) (interface{}, bool) {
+	ancestorEnv := e
+	for i := 0; i < dist; i++ {
+		ancestorEnv = ancestorEnv.ParentEnv
 	}
-	if e.ParentEnv == nil {
-		return nil, false
-	}
-	return e.ParentEnv.FindBinding(name)
+	val, ok := ancestorEnv.Bindings[name]
+	return val, ok
 }
 
 // UpdateBinding searches for a binding, starting from the nearest scope
 // and updates the value. If there's no binding in any scope, it returns
 // false.
-func (e Environment) UpdateBinding(name string, val interface{}) bool {
+func (e *Environment) UpdateBinding(name string, val interface{}) bool {
 	_, ok := e.Bindings[name]
 	if ok {
 		e.Bindings[name] = val
@@ -89,6 +87,9 @@ func (e Environment) UpdateBinding(name string, val interface{}) bool {
 }
 
 type Interpreter struct {
+	// Number of scope hops between a variable usage and its declaration
+	ScopeHops map[Expr]int
+	// In Lox, runtime environment is a dynamic manifestation of static scope
 	Globals *Environment
 	CurrEnv *Environment
 }
@@ -97,7 +98,13 @@ func MakeInterpreter() *Interpreter {
 	globals := &Environment{
 		Bindings: make(map[string]interface{}),
 	}
-	return &Interpreter{Globals: globals, CurrEnv: globals}
+	return &Interpreter{Globals: globals, CurrEnv: globals, ScopeHops: make(map[Expr]int)}
+}
+
+// Resolve tracks where a referenced variable is declared.
+// This is possible since Lox uses static scope.
+func (p *Interpreter) Resolve(expr Expr, dist int) {
+	p.ScopeHops[expr] = dist
 }
 
 func (p *Interpreter) Evaluate(stmts []Stmt) error {
@@ -453,7 +460,7 @@ func (p *Interpreter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
 func (p *Interpreter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
 	// Design choice: when searching for the value of a variable,
 	// it can be traced back to the outer scopes
-	val, ok := p.CurrEnv.FindBinding(expr.Name.Lexeme)
+	val, ok := p.CurrEnv.FindBinding(expr.Name.Lexeme, p.ScopeHops[expr])
 	if !ok {
 		return nil, &RuntimeError{Reason: fmt.Sprintf("reference an undefined variable: %s", expr.Name.Lexeme)}
 	}
