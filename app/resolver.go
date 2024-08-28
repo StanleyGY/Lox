@@ -99,6 +99,14 @@ func (r *Resolver) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	return nil
 }
 
+func (r *Resolver) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
+	if !r.declare(stmt.Name.Lexeme) {
+		return &SemanticsError{fmt.Sprintf("redefining class: %s", stmt.Name.Lexeme)}
+	}
+	r.define(stmt.Name.Lexeme)
+	return nil
+}
+
 func (r *Resolver) VisitInlineExprStmt(stmt *InlineExprStmt) error {
 	if _, err := stmt.Child.Accept(r); err != nil {
 		return err

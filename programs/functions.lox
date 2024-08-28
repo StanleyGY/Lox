@@ -50,6 +50,5 @@ var a = "global";
   showA();
   var a = "block";
   showA();
-  var a;
 }
 

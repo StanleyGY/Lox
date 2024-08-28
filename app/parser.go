@@ -9,9 +9,11 @@ Use right-associative notations:
 
 	program        → declaration* EOF
 
-	declaration    → funDecl | varDecl | statement ;
+	declaration    → classDecl | funDecl | varDecl | statement
+	classDecl      → "class" IDENTIFIER "{" function* "}"
 	varDecl    	   → "var" IDENTIFIER ( "=" EXPRESSION )? ";"
-	funDecl        → "fun" IDENTIFIER "(" parameters? ")" block
+	funDecl        → "fun" function
+	function       → IDENTIFIER "(" parameters? ")" block
 	parameters     → IDENTIFIER ( "," IDENTIFIER )*
 
 	statement      → block | exprStmt | printStmt | ifStmt | forStmt | whileStmt | returnStmt
@@ -145,11 +147,14 @@ func (p *RDParser) advanceIfMatch(tokenTypes ...int) bool {
 }
 
 func (p *RDParser) declaration() (Stmt, error) {
-	if p.advanceIfMatch(Var) {
+	if p.match(Var) {
 		return p.varDecl()
 	}
-	if p.advanceIfMatch(Fun) {
+	if p.match(Fun) {
 		return p.funDecl()
+	}
+	if p.match(Class) {
+		return p.classDecl()
 	}
 	return p.statement()
 }
@@ -159,6 +164,9 @@ func (p *RDParser) varDecl() (Stmt, error) {
 	var name *Token
 	var err error
 
+	if !p.advanceIfMatch(Var) {
+		return nil, p.emitParsingError("variable declaration missing \"var\" keyword")
+	}
 	if !p.advanceIfMatch(Identifier) {
 		return nil, p.emitParsingError("variable declaration missing identifier")
 	}
@@ -176,6 +184,13 @@ func (p *RDParser) varDecl() (Stmt, error) {
 }
 
 func (p *RDParser) funDecl() (Stmt, error) {
+	if !p.advanceIfMatch(Fun) {
+		return nil, p.emitParsingError("func declaration missing \"fun\" keyword")
+	}
+	return p.function()
+}
+
+func (p *RDParser) function() (*FuncDeclStmt, error) {
 	var name *Token
 	var parameters []*Token
 	var body Stmt
@@ -188,7 +203,7 @@ func (p *RDParser) funDecl() (Stmt, error) {
 	name = p.previous()
 
 	if !p.advanceIfMatch(LeftParen) {
-		return nil, p.emitParsingError("func declaration missing \"{\"")
+		return nil, p.emitParsingError("func declaration missing \"(\"")
 	}
 	if parameters, err = p.parameters(); err != nil {
 		return nil, err
@@ -197,7 +212,7 @@ func (p *RDParser) funDecl() (Stmt, error) {
 		return nil, p.emitParsingError("func declaration argument list too long")
 	}
 	if !p.advanceIfMatch(RightParen) {
-		return nil, p.emitParsingError("func declaration missing \"}\"")
+		return nil, p.emitParsingError("func declaration missing \")\"")
 	}
 
 	// Match function implementation
@@ -205,6 +220,35 @@ func (p *RDParser) funDecl() (Stmt, error) {
 		return nil, err
 	}
 	return &FuncDeclStmt{Name: name, Params: parameters, Body: body}, nil
+}
+
+func (p *RDParser) classDecl() (Stmt, error) {
+	var name *Token
+	var methods []*FuncDeclStmt
+	var err error
+
+	if !p.advanceIfMatch(Class) {
+		return nil, p.emitParsingError("class declaration missing \"class\" keyword")
+	}
+	if !p.advanceIfMatch(Identifier) {
+		return nil, p.emitParsingError("class declaration missing name")
+	}
+	name = p.previous()
+
+	if !p.advanceIfMatch(LeftBrace) {
+		return nil, p.emitParsingError("class declaration missing \"{\"")
+	}
+	for !p.match(RightBrace) {
+		var m *FuncDeclStmt
+		if m, err = p.function(); err != nil {
+			return nil, err
+		}
+		methods = append(methods, m)
+	}
+	if !p.advanceIfMatch(RightBrace) {
+		return nil, p.emitParsingError("func declaration missing \"}\"")
+	}
+	return &ClassDeclStmt{Name: name, Methods: methods}, nil
 }
 
 func (p *RDParser) parameters() ([]*Token, error) {

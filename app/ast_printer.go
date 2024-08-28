@@ -56,6 +56,11 @@ func (p *AstPrinter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	return nil
 }
 
+func (p *AstPrinter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
+	// TODO:
+	return nil
+}
+
 func (p *AstPrinter) VisitIfStmt(stmt *IfStmt) error {
 	p.buf.WriteString("If")
 	stmt.Condition.Accept(p)

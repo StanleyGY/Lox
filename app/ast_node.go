@@ -43,6 +43,15 @@ func (e *FuncDeclStmt) Accept(v StmtVisitor) error {
 	return v.VisitFunDeclStmt(e)
 }
 
+type ClassDeclStmt struct {
+	Name    *Token
+	Methods []*FuncDeclStmt
+}
+
+func (e *ClassDeclStmt) Accept(v StmtVisitor) error {
+	return v.VisitClassDeclStmt(e)
+}
+
 type IfStmt struct {
 	Condition  Expr
 	ThenBranch Stmt
@@ -155,6 +164,7 @@ func (e *CallExpr) Accept(v ExprVisitor) (interface{}, error) {
 type StmtVisitor interface {
 	VisitVarDeclStmt(stmt *VarDeclStmt) error
 	VisitFunDeclStmt(stmt *FuncDeclStmt) error
+	VisitClassDeclStmt(stmt *ClassDeclStmt) error
 	VisitInlineExprStmt(stmt *InlineExprStmt) error
 	VisitPrintStmt(stmt *PrintStmt) error
 	VisitBlockStmt(stmt *BlockStmt) error

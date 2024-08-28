@@ -1,0 +1,5 @@
+class Water {
+    pour(volume, target){}
+}
+
+print Water();

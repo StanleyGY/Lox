@@ -43,11 +43,6 @@ func (e RuntimeReturn) Error() string {
 	return ""
 }
 
-type LoxFunction struct {
-	Closure     *Environment
-	Declaration *FuncDeclStmt
-}
-
 type Environment struct {
 	ParentEnv *Environment
 	Bindings  map[string]interface{}
@@ -246,6 +241,14 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	return nil
 }
 
+func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
+	klass := &LoxClass{Name: stmt.Name.Lexeme}
+	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, klass) {
+		return &RuntimeError{Reason: fmt.Sprintf("double declaration for class: %s", stmt.Name.Lexeme)}
+	}
+	return nil
+}
+
 func (p *Interpreter) VisitReturnStmt(stmt *ReturnStmt) error {
 	var value interface{}
 	var err error
@@ -397,60 +400,27 @@ func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 }
 
 func (p *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
-	var loxFunc *LoxFunction
 	var err error
 	var ok bool
 
-	// Look up the function binding
+	// Look up the call binding (i.e. function / class constructor)
 	var callee interface{}
+	var callable LoxCallable
+
 	if callee, err = expr.Callee.Accept(p); err != nil {
 		return nil, err
 	}
-	if loxFunc, ok = callee.(*LoxFunction); !ok {
+	if callable, ok = callee.(LoxCallable); !ok {
 		return nil, &RuntimeError{Reason: "not a function declaration"}
 	}
-	decl := loxFunc.Declaration
 
 	// Validate arity
-	if len(decl.Params) != len(expr.Arguments) {
+	if callable.Arity() != len(expr.Arguments) {
 		return nil, &RuntimeError{Reason: "function call supplies incorrect number of parameters"}
 	}
 
-	// Create a new environment for the function call
-	env := &Environment{
-		Bindings:  make(map[string]interface{}),
-		ParentEnv: loxFunc.Closure,
-	}
-
-	// Copy arguments into current env
-	for idx := range expr.Arguments {
-		var param string
-		var argv interface{}
-		if argv, err = expr.Arguments[idx].Accept(p); err != nil {
-			return nil, err
-		}
-		param = decl.Params[idx].Lexeme
-		env.CreateBinding(param, argv)
-	}
-
-	lastEnv := p.CurrEnv
-	p.CurrEnv = env
-
-	// Evaluate the function body
-	var returnVal *RuntimeReturn
-
-	err = decl.Body.Accept(p)
-	if err != nil {
-		if returnVal, ok = err.(*RuntimeReturn); ok {
-			p.CurrEnv = lastEnv
-			return returnVal.Value, nil
-		}
-		return nil, err
-	}
-
-	// In case there's no return value, return a nil to caller
-	p.CurrEnv = lastEnv
-	return nil, nil
+	// Call function
+	return callable.Call(p, expr.Arguments)
 }
 
 func (p *Interpreter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
