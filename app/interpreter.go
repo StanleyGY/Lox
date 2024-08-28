@@ -8,6 +8,14 @@ import (
 	"strings"
 )
 
+type RuntimeError struct {
+	Reason string
+}
+
+func (e RuntimeError) Error() string {
+	return fmt.Sprintf("runtime error: %s", e.Reason)
+}
+
 type RuntimeTypeError struct {
 	Operator *Token
 	Vals     []interface{}
@@ -15,9 +23,9 @@ type RuntimeTypeError struct {
 
 func (e RuntimeTypeError) Error() string {
 	var buffer bytes.Buffer
-	buffer.WriteString("invalid types for operator ")
+	buffer.WriteString("runtime error: invalid types for operator ")
 	buffer.WriteString(e.Operator.Lexeme)
-	buffer.WriteString(" : ")
+	buffer.WriteString("on values: ")
 	for i, v := range e.Vals {
 		buffer.WriteString(reflect.ValueOf(v).String())
 		if i < len(e.Vals)-1 {
@@ -27,12 +35,16 @@ func (e RuntimeTypeError) Error() string {
 	return buffer.String()
 }
 
+type LoxFunction struct {
+	Declaration *FuncDeclStmt
+}
+
 type Environment struct {
 	ParentEnv *Environment
 	Bindings  map[string]interface{}
 }
 
-// CreateBinding creates a binding in the current scope
+// CreateBinding creates a new binding in the current scope
 func (e Environment) CreateBinding(name string, val interface{}) {
 	e.Bindings[name] = val
 }
@@ -64,27 +76,18 @@ func (e Environment) UpdateBinding(name string, val interface{}) bool {
 }
 
 type Interpreter struct {
-	Env *Environment
+	Globals *Environment
+	CurrEnv *Environment
 }
 
-func (p *Interpreter) createEnv() {
-	if p.Env == nil {
-		p.Env = &Environment{Bindings: make(map[string]interface{})}
-	} else {
-		newEnv := &Environment{
-			ParentEnv: p.Env,
-			Bindings:  make(map[string]interface{}),
-		}
-		p.Env = newEnv
+func MakeInterpreter() *Interpreter {
+	globals := &Environment{
+		Bindings: make(map[string]interface{}),
 	}
-}
-
-func (p *Interpreter) restoreEnv() {
-	p.Env = p.Env.ParentEnv
+	return &Interpreter{Globals: globals, CurrEnv: globals}
 }
 
 func (p *Interpreter) Evaluate(stmts []Stmt) error {
-	p.createEnv()
 	for _, stmt := range stmts {
 		if err := stmt.Accept(p); err != nil {
 			return err
@@ -146,7 +149,10 @@ func (p *Interpreter) VisitIfStmt(stmt *IfStmt) error {
 	if p.isTruthy(r) {
 		return stmt.ThenBranch.Accept(p)
 	}
-	return stmt.ElseBranch.Accept(p)
+	if stmt.ElseBranch != nil {
+		return stmt.ElseBranch.Accept(p)
+	}
+	return nil
 }
 
 func (p *Interpreter) VisitWhileStmt(stmt *WhileStmt) error {
@@ -157,23 +163,28 @@ func (p *Interpreter) VisitWhileStmt(stmt *WhileStmt) error {
 			return err
 		}
 		if !p.isTruthy(r) {
-			break
+			return nil
 		}
 		if err = stmt.Body.Accept(p); err != nil {
 			return err
 		}
 	}
-	return nil
 }
 
 func (p *Interpreter) VisitBlockStmt(stmt *BlockStmt) error {
-	p.createEnv()
+	newEnv := &Environment{
+		ParentEnv: p.CurrEnv,
+		Bindings:  make(map[string]interface{}),
+	}
+	p.CurrEnv = newEnv
+
 	for _, c := range stmt.Stmts {
 		if err := c.Accept(p); err != nil {
 			return err
 		}
 	}
-	p.restoreEnv()
+
+	p.CurrEnv = newEnv.ParentEnv
 	return nil
 }
 
@@ -201,7 +212,12 @@ func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 		return err
 	}
 
-	p.Env.CreateBinding(stmt.Name.Lexeme, val)
+	p.CurrEnv.CreateBinding(stmt.Name.Lexeme, val)
+	return nil
+}
+
+func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
+	p.CurrEnv.CreateBinding(stmt.Name.Lexeme, &LoxFunction{Declaration: stmt})
 	return nil
 }
 
@@ -339,9 +355,57 @@ func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 
 	// Design choice: the variable must be defined in the current scope
 	// before assigning another value
-	if !p.Env.UpdateBinding(expr.Name.Lexeme, val) {
-		return nil, fmt.Errorf("assigns value to an undefined variable: %s", expr.Name.Lexeme)
+	if !p.CurrEnv.UpdateBinding(expr.Name.Lexeme, val) {
+		return nil, &RuntimeError{Reason: fmt.Sprintf("assigns value to an undefined variable: %s", expr.Name.Lexeme)}
 	}
+	return nil, nil
+}
+
+func (p *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
+	var err error
+
+	// Look up the function binding
+	var callee interface{}
+	if callee, err = expr.Callee.Accept(p); err != nil {
+		return nil, err
+	}
+	if _, ok := callee.(*LoxFunction); !ok {
+		return nil, &RuntimeError{Reason: "not a function declaration"}
+	}
+	decl := callee.(*LoxFunction).Declaration
+
+	// Validate arity
+	if len(decl.Params) != len(expr.Arguments) {
+		return nil, &RuntimeError{Reason: "function call supplies incorrect number of parameters"}
+	}
+
+	// Create a new environment for the function call
+	env := &Environment{
+		Bindings:  make(map[string]interface{}),
+		ParentEnv: p.Globals,
+	}
+
+	for idx := range expr.Arguments {
+		var param string
+		var argv interface{}
+		if argv, err = expr.Arguments[idx].Accept(p); err != nil {
+			return nil, err
+		}
+		param = decl.Params[idx].Lexeme
+		env.CreateBinding(param, argv)
+	}
+	p.CurrEnv = env
+
+	// Evaluate the function body
+	err = decl.Body.Accept(p)
+	if err != nil {
+		return nil, err
+	}
+
+	// Restore env
+	p.CurrEnv = env.ParentEnv
+
+	// TODO: support return statement
 	return nil, nil
 }
 
@@ -350,11 +414,11 @@ func (p *Interpreter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
 }
 
 func (p *Interpreter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
-	// Design choice: when reading the value of a variable, we can walk back
-	// to the outer scopes
-	val, ok := p.Env.FindBinding(expr.Name.Lexeme)
+	// Design choice: when searching for the value of a variable,
+	// it can be traced back to the outer scopes
+	val, ok := p.CurrEnv.FindBinding(expr.Name.Lexeme)
 	if !ok {
-		return nil, fmt.Errorf("reference an undefined variable: %s", expr.Name.Lexeme)
+		return nil, &RuntimeError{Reason: fmt.Sprintf("reference an undefined variable: %s", expr.Name.Lexeme)}
 	}
 	return val, nil
 }

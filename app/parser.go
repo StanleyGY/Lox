@@ -7,29 +7,38 @@ import (
 /*
 Use right-associative notations:
 
-	program        → statement* EOF
-	statement      → block | exprStmt | printStmt | varDecl | ifStmt
-	varDecl    → "var" IDENTIFIER ("=" EXPRESSION)? ";"
+	program        → declaration* EOF
 
-	block 		   → "{" statement* "}"
+	declaration    → funDecl | varDecl | statement ;
+	varDecl    	   → "var" IDENTIFIER ( "=" EXPRESSION )? ";"
+	funDecl        → "fun" IDENTIFIER "(" parameters? ")" block
+	parameters     → IDENTIFIER ( "," IDENTIFIER )*
+
+	statement      → block | exprStmt | printStmt | varDecl | ifStmt
+	block 		   → "{" declaration* "}"
 	exprStmt       → expression ";"
 	printStmt      → "print" expression ";"
 	ifStmt		   → "if" "(" expression ")" statement ( "else" statement )?
-	forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) | expression? ";" expression? ")" statement ;
+	forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) | expression? ";" expression? ")" statement
 	whileStmt      → "while" "(" expression ")" statement
 
 	expression     → assignment
-	assignment     → lvalue "=" assignment) | logic_or
+	assignment     → lvalue "=" assignment | logic_or
 	logic_or	   → logic_and ( "or" logic_and )*
 	logic_and      → equality ( "and" equality )*
-
-	equality       → comparison ( ( "!=" | "==" ) comparison )*
-	comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )*
-	term           → factor ( ( "-" | "+" ) factor )*
-	factor         → unary ( ( "/" | "*" ) unary )*
-	unary          → ( "!" | "-" ) unary | primary
+	equality       → comparison (( "!=" | "==" ) comparison )*
+	comparison     → term (( ">" | ">=" | "<" | "<=" ) term )*
+	term           → factor (( "-" | "+" ) factor )*
+	factor         → unary (( "/" | "*" ) unary )*
+	unary          → (( "!" | "-" ) unary) | call
+	call           → primary ( "(" arguments? ")" )*
+	arguments      → expression ( "," expression )*
 	primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
 */
+
+const (
+	MaxNumFunCallArguments = 255
+)
 
 type Parser interface {
 	Parse(tokens []*Token) []Stmt
@@ -83,7 +92,7 @@ func (p *RDParser) Parse(tokens []*Token) ([]Stmt, error) {
 			// TODO: what's the use for EOF?
 			break
 		}
-		if stmt, err = p.statement(); err != nil {
+		if stmt, err = p.declaration(); err != nil {
 			return nil, err
 		}
 		stmts = append(stmts, stmt)
@@ -134,12 +143,93 @@ func (p *RDParser) advanceIfMatch(tokenTypes ...int) bool {
 	return false
 }
 
+func (p *RDParser) declaration() (Stmt, error) {
+	if p.advanceIfMatch(Var) {
+		return p.varDecl()
+	}
+	if p.advanceIfMatch(Fun) {
+		return p.funDecl()
+	}
+	return p.statement()
+}
+
+func (p *RDParser) varDecl() (Stmt, error) {
+	var initializer Expr
+	var name *Token
+	var err error
+
+	if !p.advanceIfMatch(Identifier) {
+		return nil, p.emitParsingError("variable declaration missing identifier")
+	}
+	name = p.previous()
+
+	if p.advanceIfMatch(Equal) {
+		if initializer, err = p.expression(); err != nil {
+			return nil, err
+		}
+	}
+	if !p.advanceIfMatch(SemiColon) {
+		return nil, p.emitParsingError("missing \";\"")
+	}
+	return &VarDeclStmt{Name: name, Initializer: initializer}, nil
+}
+
+func (p *RDParser) funDecl() (Stmt, error) {
+	var name *Token
+	var parameters []*Token
+	var body Stmt
+	var err error
+
+	// Match function signatures
+	if !p.advanceIfMatch(Identifier) {
+		return nil, p.emitParsingError("func declaration missing name")
+	}
+	name = p.previous()
+
+	if !p.advanceIfMatch(LeftParen) {
+		return nil, p.emitParsingError("func declaration missing \"{\"")
+	}
+	if parameters, err = p.parameters(); err != nil {
+		return nil, err
+	}
+	if len(parameters) > MaxNumFunCallArguments {
+		return nil, p.emitParsingError("func declaration argument list too long")
+	}
+	if !p.advanceIfMatch(RightParen) {
+		return nil, p.emitParsingError("func declaration missing \"}\"")
+	}
+
+	// Match function implementation
+	if !p.advanceIfMatch(LeftBrace) {
+		return nil, p.emitParsingError("func body missing \"{\"")
+	}
+	if body, err = p.blockStatement(); err != nil {
+		return nil, err
+	}
+	return &FuncDeclStmt{Name: name, Params: parameters, Body: body}, nil
+}
+
+func (p *RDParser) parameters() ([]*Token, error) {
+	var params []*Token
+
+	// Function with no parameters
+	if !p.match(Identifier) {
+		return params, nil
+	}
+	for {
+		if !p.advanceIfMatch(Identifier) {
+			return nil, p.emitParsingError("missing func parameter after \",\"")
+		}
+		params = append(params, p.previous())
+		if !p.advanceIfMatch(Comma) {
+			return params, nil
+		}
+	}
+}
+
 func (p *RDParser) statement() (Stmt, error) {
 	if p.advanceIfMatch(Print) {
 		return p.printStatement()
-	}
-	if p.advanceIfMatch(Var) {
-		return p.varDeclStatement()
 	}
 	if p.advanceIfMatch(LeftBrace) {
 		return p.blockStatement()
@@ -177,30 +267,9 @@ func (p *RDParser) expressionStatement() (Stmt, error) {
 		return nil, err
 	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, p.emitParsingError("missing ;")
+		return nil, p.emitParsingError("missing \";\"")
 	}
 	return &InlineExprStmt{Child: expr}, nil
-}
-
-func (p *RDParser) varDeclStatement() (Stmt, error) {
-	var initializer Expr
-	var name *Token
-	var err error
-
-	if !p.advanceIfMatch(Identifier) {
-		return nil, p.emitParsingError("variable declaration missing identifier")
-	}
-	name = p.previous()
-
-	if p.advanceIfMatch(Equal) {
-		if initializer, err = p.expression(); err != nil {
-			return nil, err
-		}
-	}
-	if !p.advanceIfMatch(SemiColon) {
-		return nil, p.emitParsingError("missing ;")
-	}
-	return &VarDeclStmt{Name: name, Initializer: initializer}, nil
 }
 
 func (p *RDParser) blockStatement() (Stmt, error) {
@@ -209,7 +278,7 @@ func (p *RDParser) blockStatement() (Stmt, error) {
 		var stmt Stmt
 		var err error
 
-		if stmt, err = p.statement(); err != nil {
+		if stmt, err = p.declaration(); err != nil {
 			return nil, err
 		}
 		stmts = append(stmts, stmt)
@@ -280,7 +349,7 @@ func (p *RDParser) forStatement() (Stmt, error) {
 	}
 	// Initializer clause
 	if p.advanceIfMatch(Var) {
-		if initializer, err = p.varDeclStatement(); err != nil {
+		if initializer, err = p.varDecl(); err != nil {
 			return nil, err
 		}
 	} else if !p.advanceIfMatch(SemiColon) {
@@ -483,7 +552,47 @@ func (p *RDParser) unary() (Expr, error) {
 		}
 		return &UnaryExpr{Operator: op, Right: right}, nil
 	}
-	return p.primary()
+	return p.call()
+}
+
+func (p *RDParser) call() (Expr, error) {
+	var callee Expr
+	var arguments []Expr
+	var err error
+
+	if callee, err = p.primary(); err != nil {
+		return nil, err
+	}
+	if p.advanceIfMatch(LeftParen) {
+		if arguments, err = p.arguments(); err != nil {
+			return nil, err
+		}
+		if len(arguments) >= MaxNumFunCallArguments {
+			return nil, p.emitParsingError("func call argument list too long")
+		}
+		if !p.advanceIfMatch(RightParen) {
+			return nil, p.emitParsingError("func call argument list missing \")\"")
+		}
+		return &CallExpr{Callee: callee, Arguments: arguments}, nil
+	}
+	return callee, nil
+}
+
+func (p *RDParser) arguments() ([]Expr, error) {
+	var exprs []Expr
+	var expr Expr
+	var err error
+
+	for {
+		if expr, err = p.expression(); err != nil {
+			return nil, err
+		}
+		exprs = append(exprs, expr)
+		if !p.advanceIfMatch(Comma) {
+			break
+		}
+	}
+	return exprs, nil
 }
 
 func (p *RDParser) primary() (Expr, error) {

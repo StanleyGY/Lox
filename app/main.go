@@ -33,7 +33,7 @@ func main() {
 	}
 
 	// Evaluate
-	interpreter := &Interpreter{}
+	interpreter := MakeInterpreter()
 	err = interpreter.Evaluate(stmts)
 	if err != nil {
 		fmt.Println(err)

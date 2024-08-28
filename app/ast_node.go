@@ -33,6 +33,16 @@ func (e *VarDeclStmt) Accept(v Visitor) error {
 	return v.VisitVarDeclStmt(e)
 }
 
+type FuncDeclStmt struct {
+	Name   *Token
+	Params []*Token
+	Body   Stmt
+}
+
+func (e *FuncDeclStmt) Accept(v Visitor) error {
+	return v.VisitFunDeclStmt(e)
+}
+
 type IfStmt struct {
 	Condition  Expr
 	ThenBranch Stmt
@@ -124,10 +134,21 @@ func (e *AssignExpr) Accept(v Visitor) (interface{}, error) {
 	return v.VisitAssignExpr(e)
 }
 
+type CallExpr struct {
+	Callee    Expr
+	Arguments []Expr
+}
+
+func (e *CallExpr) Accept(v Visitor) (interface{}, error) {
+	return v.VisitCallExpr(e)
+}
+
 type Visitor interface {
+	VisitVarDeclStmt(stmt *VarDeclStmt) error
+	VisitFunDeclStmt(stmt *FuncDeclStmt) error
+
 	VisitInlineExprStmt(stmt *InlineExprStmt) error
 	VisitPrintStmt(stmt *PrintStmt) error
-	VisitVarDeclStmt(stmt *VarDeclStmt) error
 	VisitBlockStmt(stmt *BlockStmt) error
 	VisitIfStmt(stmt *IfStmt) error
 	VisitWhileStmt(stmt *WhileStmt) error
@@ -138,5 +159,6 @@ type Visitor interface {
 	VisitGroupingExpr(expr *GroupingExpr) (interface{}, error)
 	VisitLiteralExpr(expr *LiteralExpr) (interface{}, error)
 	VisitAssignExpr(expr *AssignExpr) (interface{}, error)
+	VisitCallExpr(expr *CallExpr) (interface{}, error)
 	VisitVariableExpr(expr *VariableExpr) (interface{}, error)
 }

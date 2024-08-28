@@ -51,6 +51,11 @@ func (p *AstPrinter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 	return nil
 }
 
+func (p *AstPrinter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
+	// TODO:
+	return nil
+}
+
 func (p *AstPrinter) VisitIfStmt(stmt *IfStmt) error {
 	p.buf.WriteString("If")
 	stmt.Condition.Accept(p)
@@ -90,6 +95,10 @@ func (p *AstPrinter) VisitLogicalExpr(expr *LogicExpr) (interface{}, error) {
 
 func (p *AstPrinter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 	p.parenthesis("let", &LiteralExpr{expr.Name}, expr.Value)
+	return nil, nil
+}
+
+func (p *AstPrinter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
 	return nil, nil
 }
 
