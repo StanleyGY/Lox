@@ -44,6 +44,7 @@ func (e RuntimeReturn) Error() string {
 }
 
 type LoxFunction struct {
+	Closure     *Environment
 	Declaration *FuncDeclStmt
 }
 
@@ -53,8 +54,12 @@ type Environment struct {
 }
 
 // CreateBinding creates a new binding in the current scope
-func (e Environment) CreateBinding(name string, val interface{}) {
+func (e Environment) CreateBinding(name string, val interface{}) bool {
+	if _, ok := e.Bindings[name]; ok {
+		return false
+	}
 	e.Bindings[name] = val
+	return true
 }
 
 func (e Environment) FindBinding(name string) (interface{}, bool) {
@@ -219,13 +224,18 @@ func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 	if val, err = stmt.Initializer.Accept(p); err != nil {
 		return err
 	}
-
-	p.CurrEnv.CreateBinding(stmt.Name.Lexeme, val)
+	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, val) {
+		return &RuntimeError{Reason: fmt.Sprintf("double declaration for variable: %s", stmt.Name.Lexeme)}
+	}
 	return nil
 }
 
 func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
-	p.CurrEnv.CreateBinding(stmt.Name.Lexeme, &LoxFunction{Declaration: stmt})
+	// A function closure is the runtime environment when the function is declared
+	loxFunc := &LoxFunction{Declaration: stmt, Closure: p.CurrEnv}
+	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, loxFunc) {
+		return &RuntimeError{Reason: fmt.Sprintf("double declaration for function: %s", stmt.Name.Lexeme)}
+	}
 	return nil
 }
 
@@ -380,17 +390,19 @@ func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 }
 
 func (p *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
+	var loxFunc *LoxFunction
 	var err error
+	var ok bool
 
 	// Look up the function binding
 	var callee interface{}
 	if callee, err = expr.Callee.Accept(p); err != nil {
 		return nil, err
 	}
-	if _, ok := callee.(*LoxFunction); !ok {
+	if loxFunc, ok = callee.(*LoxFunction); !ok {
 		return nil, &RuntimeError{Reason: "not a function declaration"}
 	}
-	decl := callee.(*LoxFunction).Declaration
+	decl := loxFunc.Declaration
 
 	// Validate arity
 	if len(decl.Params) != len(expr.Arguments) {
@@ -400,9 +412,10 @@ func (p *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
 	// Create a new environment for the function call
 	env := &Environment{
 		Bindings:  make(map[string]interface{}),
-		ParentEnv: p.Globals,
+		ParentEnv: loxFunc.Closure,
 	}
 
+	// Copy arguments into current env
 	for idx := range expr.Arguments {
 		var param string
 		var argv interface{}
@@ -412,23 +425,24 @@ func (p *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
 		param = decl.Params[idx].Lexeme
 		env.CreateBinding(param, argv)
 	}
+
+	lastEnv := p.CurrEnv
 	p.CurrEnv = env
 
 	// Evaluate the function body
 	var returnVal *RuntimeReturn
-	var ok bool
 
 	err = decl.Body.Accept(p)
 	if err != nil {
 		if returnVal, ok = err.(*RuntimeReturn); ok {
-			p.CurrEnv = env.ParentEnv
+			p.CurrEnv = lastEnv
 			return returnVal.Value, nil
 		}
 		return nil, err
 	}
 
 	// In case there's no return value, return a nil to caller
-	p.CurrEnv = env.ParentEnv
+	p.CurrEnv = lastEnv
 	return nil, nil
 }
 

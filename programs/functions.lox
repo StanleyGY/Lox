@@ -1,7 +1,7 @@
 fun add(a, b) {
     print a + b;
 }
-print "add:";
+print "Test function - add:";
 add(1, 2);
 
 fun count(n) {
@@ -10,11 +10,27 @@ fun count(n) {
         count(n - 1);
     }
 }
-print "count:";
+print "Test recursive function - count:";
 count(3);
 
 fun sub(a, b) {
     return a - b;
 }
-print "sub:";
+print "Test return - sub:";
 print sub(3, 2);
+
+fun lazySub(a, b) {
+    fun lazyCallback() {
+        return a - b;
+    }
+    return lazyCallback;
+}
+
+fun lazyCallback() {
+    print "another fake lazy callback";
+}
+
+print "Test closure:";
+var callback = lazySub(4, 2);
+print callback();
+print lazyCallback();

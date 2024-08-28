@@ -597,16 +597,20 @@ func (p *RDParser) call() (Expr, error) {
 		return nil, err
 	}
 	if p.advanceIfMatch(LeftParen) {
-		if arguments, err = p.arguments(); err != nil {
-			return nil, err
+		if p.advanceIfMatch(RightParen) {
+			return &CallExpr{Callee: callee}, nil
+		} else {
+			if arguments, err = p.arguments(); err != nil {
+				return nil, err
+			}
+			if len(arguments) >= MaxNumFunCallArguments {
+				return nil, p.emitParsingError("func call argument list too long")
+			}
+			if !p.advanceIfMatch(RightParen) {
+				return nil, p.emitParsingError("func call argument list missing \")\"")
+			}
+			return &CallExpr{Callee: callee, Arguments: arguments}, nil
 		}
-		if len(arguments) >= MaxNumFunCallArguments {
-			return nil, p.emitParsingError("func call argument list too long")
-		}
-		if !p.advanceIfMatch(RightParen) {
-			return nil, p.emitParsingError("func call argument list missing \")\"")
-		}
-		return &CallExpr{Callee: callee, Arguments: arguments}, nil
 	}
 	return callee, nil
 }
