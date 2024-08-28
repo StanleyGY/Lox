@@ -201,10 +201,7 @@ func (p *RDParser) funDecl() (Stmt, error) {
 	}
 
 	// Match function implementation
-	if !p.advanceIfMatch(LeftBrace) {
-		return nil, p.emitParsingError("func body missing \"{\"")
-	}
-	if body, err = p.blockStatement(); err != nil {
+	if body, err = p.blockStmt(); err != nil {
 		return nil, err
 	}
 	return &FuncDeclStmt{Name: name, Params: parameters, Body: body}, nil
@@ -229,36 +226,39 @@ func (p *RDParser) parameters() ([]*Token, error) {
 }
 
 func (p *RDParser) statement() (Stmt, error) {
-	if p.advanceIfMatch(Print) {
-		return p.printStatement()
+	if p.match(Print) {
+		return p.printStmt()
 	}
-	if p.advanceIfMatch(LeftBrace) {
-		return p.blockStatement()
+	if p.match(LeftBrace) {
+		return p.blockStmt()
 	}
-	if p.advanceIfMatch(If) {
-		return p.ifStatement()
+	if p.match(If) {
+		return p.ifStmt()
 	}
-	if p.advanceIfMatch(While) {
-		return p.whileStatement()
+	if p.match(While) {
+		return p.whileStmt()
 	}
-	if p.advanceIfMatch(For) {
-		return p.forStatement()
+	if p.match(For) {
+		return p.forStmt()
 	}
-	if p.advanceIfMatch(Return) {
-		return p.returnStatement()
+	if p.match(Return) {
+		return p.returnStmt()
 	}
 	return p.expressionStatement()
 }
 
-func (p *RDParser) printStatement() (Stmt, error) {
+func (p *RDParser) printStmt() (Stmt, error) {
 	var expr Expr
 	var err error
 
+	if !p.advanceIfMatch(Print) {
+		return nil, p.emitParsingError("missing \"print\" keyword")
+	}
 	if expr, err = p.expression(); err != nil {
 		return nil, err
 	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, &ParsingError{Reason: "missing \";\"", TokenIdx: p.currIdx, Tokens: p.tokens}
+		return nil, p.emitParsingError("missing \";\"")
 	}
 	return &PrintStmt{Child: expr}, nil
 }
@@ -276,8 +276,12 @@ func (p *RDParser) expressionStatement() (Stmt, error) {
 	return &InlineExprStmt{Child: expr}, nil
 }
 
-func (p *RDParser) blockStatement() (Stmt, error) {
+func (p *RDParser) blockStmt() (Stmt, error) {
 	var stmts []Stmt
+
+	if !p.advanceIfMatch(LeftBrace) {
+		return nil, p.emitParsingError("missing \"{\"")
+	}
 	for p.hasNext() && !p.match(RightBrace) {
 		var stmt Stmt
 		var err error
@@ -288,17 +292,20 @@ func (p *RDParser) blockStatement() (Stmt, error) {
 		stmts = append(stmts, stmt)
 	}
 	if !p.advanceIfMatch(RightBrace) {
-		return nil, p.emitParsingError("block missing \"}\"")
+		return nil, p.emitParsingError("missing \"}\"")
 	}
 	return &BlockStmt{Stmts: stmts}, nil
 }
 
-func (p *RDParser) ifStatement() (Stmt, error) {
+func (p *RDParser) ifStmt() (Stmt, error) {
 	var condition Expr
 	var thenBranch Stmt
 	var elseBranch Stmt
 	var err error
 
+	if !p.advanceIfMatch(If) {
+		return nil, p.emitParsingError("missing \"if\" keyword")
+	}
 	if !p.advanceIfMatch(LeftParen) {
 		return nil, p.emitParsingError("if condition missing \"{\"")
 	}
@@ -322,10 +329,13 @@ func (p *RDParser) ifStatement() (Stmt, error) {
 	return &IfStmt{Condition: condition, ThenBranch: thenBranch, ElseBranch: elseBranch}, nil
 }
 
-func (p *RDParser) whileStatement() (Stmt, error) {
+func (p *RDParser) whileStmt() (Stmt, error) {
 	var condition Expr
 	var body Stmt
 	var err error
+	if !p.advanceIfMatch(While) {
+		return nil, p.emitParsingError("missing \"while\" keyword")
+	}
 	if !p.advanceIfMatch(LeftParen) {
 		return nil, p.emitParsingError("while loop missing \"{\"")
 	}
@@ -341,13 +351,16 @@ func (p *RDParser) whileStatement() (Stmt, error) {
 	return &WhileStmt{Condition: condition, Body: body}, nil
 }
 
-func (p *RDParser) forStatement() (Stmt, error) {
+func (p *RDParser) forStmt() (Stmt, error) {
 	var initializer Stmt
 	var condition Expr
 	var increment Expr
 	var body Stmt
 	var err error
 
+	if !p.advanceIfMatch(For) {
+		return nil, p.emitParsingError("missing \"for\" keyword")
+	}
 	if !p.advanceIfMatch(LeftParen) {
 		return nil, p.emitParsingError("for loop missing \"(\"")
 	}
@@ -401,10 +414,13 @@ func (p *RDParser) forStatement() (Stmt, error) {
 	return whileStmt, nil
 }
 
-func (p *RDParser) returnStatement() (Stmt, error) {
+func (p *RDParser) returnStmt() (Stmt, error) {
 	var expr Expr
 	var err error
 
+	if !p.advanceIfMatch(Return) {
+		return nil, p.emitParsingError("missing \"return\" keyword")
+	}
 	if expr, err = p.expression(); err != nil {
 		return nil, err
 	}
