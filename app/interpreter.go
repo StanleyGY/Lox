@@ -35,6 +35,14 @@ func (e RuntimeTypeError) Error() string {
 	return buffer.String()
 }
 
+type RuntimeReturn struct {
+	Value interface{}
+}
+
+func (e RuntimeReturn) Error() string {
+	return ""
+}
+
 type LoxFunction struct {
 	Declaration *FuncDeclStmt
 }
@@ -221,6 +229,16 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	return nil
 }
 
+func (p *Interpreter) VisitReturnStmt(stmt *ReturnStmt) error {
+	var value interface{}
+	var err error
+	if value, err = stmt.Value.Accept(p); err != nil {
+		return err
+	}
+	// Return an error to unwind the call stack until reaching CallExpr
+	return &RuntimeReturn{Value: value}
+}
+
 func (p *Interpreter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {
 	var leftVal interface{}
 	var rightVal interface{}
@@ -397,15 +415,20 @@ func (p *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
 	p.CurrEnv = env
 
 	// Evaluate the function body
+	var returnVal *RuntimeReturn
+	var ok bool
+
 	err = decl.Body.Accept(p)
 	if err != nil {
+		if returnVal, ok = err.(*RuntimeReturn); ok {
+			p.CurrEnv = env.ParentEnv
+			return returnVal.Value, nil
+		}
 		return nil, err
 	}
 
-	// Restore env
+	// In case there's no return value, return a nil to caller
 	p.CurrEnv = env.ParentEnv
-
-	// TODO: support return statement
 	return nil, nil
 }
 

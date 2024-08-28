@@ -14,13 +14,14 @@ Use right-associative notations:
 	funDecl        → "fun" IDENTIFIER "(" parameters? ")" block
 	parameters     → IDENTIFIER ( "," IDENTIFIER )*
 
-	statement      → block | exprStmt | printStmt | varDecl | ifStmt
+	statement      → block | exprStmt | printStmt | ifStmt | forStmt | whileStmt | returnStmt
 	block 		   → "{" declaration* "}"
 	exprStmt       → expression ";"
 	printStmt      → "print" expression ";"
 	ifStmt		   → "if" "(" expression ")" statement ( "else" statement )?
 	forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) | expression? ";" expression? ")" statement
 	whileStmt      → "while" "(" expression ")" statement
+	returnStmt     → "return" expression? ";"
 
 	expression     → assignment
 	assignment     → lvalue "=" assignment | logic_or
@@ -243,6 +244,9 @@ func (p *RDParser) statement() (Stmt, error) {
 	if p.advanceIfMatch(For) {
 		return p.forStatement()
 	}
+	if p.advanceIfMatch(Return) {
+		return p.returnStatement()
+	}
 	return p.expressionStatement()
 }
 
@@ -395,6 +399,19 @@ func (p *RDParser) forStatement() (Stmt, error) {
 		return &BlockStmt{Stmts: []Stmt{initializer, whileStmt}}, nil
 	}
 	return whileStmt, nil
+}
+
+func (p *RDParser) returnStatement() (Stmt, error) {
+	var expr Expr
+	var err error
+
+	if expr, err = p.expression(); err != nil {
+		return nil, err
+	}
+	if !p.advanceIfMatch(SemiColon) {
+		return nil, p.emitParsingError("return statement missing \";\"")
+	}
+	return &ReturnStmt{Value: expr}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {

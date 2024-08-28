@@ -12,3 +12,9 @@ fun count(n) {
 }
 print "count:";
 count(3);
+
+fun sub(a, b) {
+    return a - b;
+}
+print "sub:";
+print sub(3, 2);
