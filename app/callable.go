@@ -69,7 +69,7 @@ type LoxClass struct {
 
 func (c *LoxClass) Call(interpreter *Interpreter, args []Expr) (interface{}, error) {
 	// Create an instance of the class
-	return &LoxClassInstance{Class: c}, nil
+	return MakeLoxClassInstance(c), nil
 }
 
 func (c *LoxClass) Arity() int {
@@ -82,7 +82,15 @@ func (c LoxClass) String() string {
 }
 
 type LoxClassInstance struct {
-	Class *LoxClass
+	Class      *LoxClass
+	Properties map[string]interface{}
+}
+
+func MakeLoxClassInstance(klass *LoxClass) *LoxClassInstance {
+	return &LoxClassInstance{
+		Class:      klass,
+		Properties: make(map[string]interface{}),
+	}
 }
 
 func (i LoxClassInstance) String() string {

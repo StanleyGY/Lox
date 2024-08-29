@@ -423,6 +423,53 @@ func (p *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
 	return callable.Call(p, expr.Arguments)
 }
 
+func (p *Interpreter) VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, error) {
+	var object interface{}
+	var loxInstance *LoxClassInstance
+	var ok bool
+	var err error
+
+	// Get lox class instance
+	if object, err = expr.Object.Accept(p); err != nil {
+		return nil, err
+	}
+	if loxInstance, ok = object.(*LoxClassInstance); !ok {
+		return nil, &RuntimeError{"cannot convert to a LoxClass instance"}
+	}
+
+	// Access property from the Lox class instance
+	var val interface{}
+	if val, ok = loxInstance.Properties[expr.Property.Lexeme]; !ok {
+		return nil, &RuntimeError{fmt.Sprintf("class %s does not have the field %s", loxInstance.Class, expr.Property.Lexeme)}
+	}
+
+	return val, nil
+}
+
+func (p *Interpreter) VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, error) {
+	var object interface{}
+	var loxInstance *LoxClassInstance
+	var val interface{}
+	var ok bool
+	var err error
+
+	// Get lox class instance
+	if object, err = expr.Object.Accept(p); err != nil {
+		return nil, err
+	}
+	if loxInstance, ok = object.(*LoxClassInstance); !ok {
+		return nil, &RuntimeError{"cannot convert to a LoxClass instance"}
+	}
+
+	// Evaluate value
+	if val, err = expr.Value.Accept(p); err != nil {
+		return nil, err
+	}
+
+	loxInstance.Properties[expr.Property.Lexeme] = val
+	return val, nil
+}
+
 func (p *Interpreter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
 	return expr.Value, nil
 }

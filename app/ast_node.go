@@ -161,6 +161,25 @@ func (e *CallExpr) Accept(v ExprVisitor) (interface{}, error) {
 	return v.VisitCallExpr(e)
 }
 
+type GetPropertyExpr struct {
+	Object   Expr
+	Property *Token
+}
+
+func (e *GetPropertyExpr) Accept(v ExprVisitor) (interface{}, error) {
+	return v.VisitGetPropertyExpr(e)
+}
+
+type SetPropertyExpr struct {
+	Object   Expr
+	Property *Token
+	Value    Expr
+}
+
+func (e *SetPropertyExpr) Accept(v ExprVisitor) (interface{}, error) {
+	return v.VisitSetPropertyExpr(e)
+}
+
 type StmtVisitor interface {
 	VisitVarDeclStmt(stmt *VarDeclStmt) error
 	VisitFunDeclStmt(stmt *FuncDeclStmt) error
@@ -181,5 +200,7 @@ type ExprVisitor interface {
 	VisitLiteralExpr(expr *LiteralExpr) (interface{}, error)
 	VisitAssignExpr(expr *AssignExpr) (interface{}, error)
 	VisitCallExpr(expr *CallExpr) (interface{}, error)
+	VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, error)
+	VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, error)
 	VisitVariableExpr(expr *VariableExpr) (interface{}, error)
 }

@@ -26,7 +26,7 @@ Use right-associative notations:
 	returnStmt     → "return" expression? ";"
 
 	expression     → assignment
-	assignment     → lvalue "=" assignment | logic_or
+	assignment     → ( call "." ) ? IDENTIFIER "=" assignment | logic_or
 	logic_or	   → logic_and ( "or" logic_and )*
 	logic_and      → equality ( "and" equality )*
 	equality       → comparison (( "!=" | "==" ) comparison )*
@@ -34,7 +34,7 @@ Use right-associative notations:
 	term           → factor (( "-" | "+" ) factor )*
 	factor         → unary (( "/" | "*" ) unary )*
 	unary          → (( "!" | "-" ) unary) | call
-	call           → primary ( "(" arguments? ")" )*
+	call           → primary ( "(" arguments? ")" | "." IDENTIFIER )*
 	arguments      → expression ( "," expression )*
 	primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
 */
@@ -479,8 +479,7 @@ func (p *RDParser) expression() (Expr, error) {
 }
 
 func (p *RDParser) assignment() (Expr, error) {
-	var name Expr
-	var value Expr
+	var left Expr
 	var err error
 
 	// If an "assignment" rule is satisfied by an assignment expression,
@@ -488,26 +487,33 @@ func (p *RDParser) assignment() (Expr, error) {
 	// The RHS of this expr is a r-value expr that evaluates to a value.
 	// A l-value expr happens to satisfy "logicOr" rule, so we can use "logicOr" rule to parse it
 	// and filter out the well-defined variants.
-	if name, err = p.logicOr(); err != nil {
+	if left, err = p.logicOr(); err != nil {
 		return nil, err
 	}
 
-	// This is an "logicOr" expr
-	if !p.advanceIfMatch(Equal) {
-		return name, nil
-	}
+	// Actually does assignment
+	if p.advanceIfMatch(Equal) {
+		var value Expr
 
-	// This expr should start with an identifier followed by "logicOr" expr
-	if value, err = p.assignment(); err != nil {
-		return nil, err
-	}
+		// This expr should start with an identifier followed by "logicOr" expr
+		if value, err = p.assignment(); err != nil {
+			return nil, err
+		}
 
-	// TODO: support more l-value expr
-	varName, ok := name.(*VariableExpr)
-	if !ok {
-		return nil, p.emitParsingError("invalid assignment target")
+		switch left := left.(type) {
+		case *VariableExpr:
+			return &AssignExpr{Name: left.Name, Value: value}, nil
+		case *GetPropertyExpr:
+			return &SetPropertyExpr{
+				Object:   left.Object,
+				Property: left.Property,
+				Value:    value,
+			}, nil
+		default:
+			return nil, p.emitParsingError("invalid assignment target")
+		}
 	}
-	return &AssignExpr{Name: varName.Name, Value: value}, nil
+	return left, nil
 }
 
 func (p *RDParser) logicOr() (Expr, error) {
@@ -640,7 +646,16 @@ func (p *RDParser) call() (Expr, error) {
 	if callee, err = p.primary(); err != nil {
 		return nil, err
 	}
+
+	if p.advanceIfMatch(Dot) {
+		// Handle get property
+		if !p.advanceIfMatch(Identifier) {
+			return nil, p.emitParsingError("missing identifier for property access")
+		}
+		return &GetPropertyExpr{Object: callee, Property: p.previous()}, nil
+	}
 	if p.advanceIfMatch(LeftParen) {
+		// Handle argument list
 		if p.advanceIfMatch(RightParen) {
 			return &CallExpr{Callee: callee}, nil
 		} else {

@@ -228,6 +228,20 @@ func (r *Resolver) VisitCallExpr(expr *CallExpr) (interface{}, error) {
 	return nil, nil
 }
 
+func (r *Resolver) VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, error) {
+	return expr.Object.Accept(r)
+}
+
+func (r *Resolver) VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, error) {
+	if _, err := expr.Object.Accept(r); err != nil {
+		return nil, err
+	}
+	if _, err := expr.Value.Accept(r); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
 func (r *Resolver) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
 	if defined, declared := r.scopes[len(r.scopes)-1][expr.Name.Lexeme]; declared && !defined {
 		return nil, &SemanticsError{Reason: fmt.Sprintf("variable referencing itself in its own initializer: %s", expr.Name.Lexeme)}

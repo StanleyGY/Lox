@@ -112,6 +112,14 @@ func (p *AstPrinter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
 	return nil, nil
 }
 
+func (p *AstPrinter) VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, error) {
+	return nil, nil
+}
+
+func (p *AstPrinter) VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, error) {
+	return nil, nil
+}
+
 func (p *AstPrinter) VisitGroupingExpr(expr *GroupingExpr) (interface{}, error) {
 	p.parenthesis("Group", expr.Child)
 	return nil, nil

@@ -2,4 +2,7 @@ class Water {
     pour(volume, target){}
 }
 
-print Water();
+var water = Water();
+water.density = 1;
+print water;
+print water.density;
