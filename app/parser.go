@@ -26,7 +26,7 @@ Use right-associative notations:
 	returnStmt     → "return" expression? ";"
 
 	expression     → assignment
-	assignment     → ( call "." ) ? IDENTIFIER "=" assignment | logic_or
+	assignment     → ( call "." )? IDENTIFIER "=" assignment | logic_or
 	logic_or	   → logic_and ( "or" logic_and )*
 	logic_and      → equality ( "and" equality )*
 	equality       → comparison (( "!=" | "==" ) comparison )*
@@ -639,39 +639,43 @@ func (p *RDParser) unary() (Expr, error) {
 }
 
 func (p *RDParser) call() (Expr, error) {
-	var callee Expr
-	var arguments []Expr
+	var expr Expr
 	var err error
 
-	if callee, err = p.primary(); err != nil {
+	if expr, err = p.primary(); err != nil {
 		return nil, err
 	}
 
-	if p.advanceIfMatch(Dot) {
-		// Handle get property
-		if !p.advanceIfMatch(Identifier) {
-			return nil, p.emitParsingError("missing identifier for property access")
-		}
-		return &GetPropertyExpr{Object: callee, Property: p.previous()}, nil
-	}
-	if p.advanceIfMatch(LeftParen) {
-		// Handle argument list
-		if p.advanceIfMatch(RightParen) {
-			return &CallExpr{Callee: callee}, nil
+	for {
+		if p.advanceIfMatch(Dot) {
+			// Handle class property-get call
+			if !p.advanceIfMatch(Identifier) {
+				return nil, p.emitParsingError("missing identifier for property access")
+			}
+			expr = &GetPropertyExpr{Object: expr, Property: p.previous()}
+
+		} else if p.advanceIfMatch(LeftParen) {
+			// Handle regular function call
+			if p.advanceIfMatch(RightParen) {
+				expr = &CallExpr{Callee: expr}
+			} else {
+				var arguments []Expr
+				if arguments, err = p.arguments(); err != nil {
+					return nil, err
+				}
+				if len(arguments) >= MaxNumFunCallArguments {
+					return nil, p.emitParsingError("func call argument list too long")
+				}
+				if !p.advanceIfMatch(RightParen) {
+					return nil, p.emitParsingError("func call argument list missing \")\"")
+				}
+				expr = &CallExpr{Callee: expr, Arguments: arguments}
+			}
 		} else {
-			if arguments, err = p.arguments(); err != nil {
-				return nil, err
-			}
-			if len(arguments) >= MaxNumFunCallArguments {
-				return nil, p.emitParsingError("func call argument list too long")
-			}
-			if !p.advanceIfMatch(RightParen) {
-				return nil, p.emitParsingError("func call argument list missing \")\"")
-			}
-			return &CallExpr{Callee: callee, Arguments: arguments}, nil
+			break
 		}
 	}
-	return callee, nil
+	return expr, nil
 }
 
 func (p *RDParser) arguments() ([]Expr, error) {

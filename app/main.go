@@ -32,9 +32,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	interpreter := MakeInterpreter()
+	// Print ast tree
+	printer := &AstPrinter{}
+	for _, stmt := range stmts {
+		fmt.Println(printer.PrettyPrintStmt(stmt))
+	}
+	fmt.Println("========================")
 
 	// Run resolver
+	interpreter := MakeInterpreter()
 	resolver := MakeResolver(interpreter)
 	err = resolver.Resolve(stmts)
 	if err != nil {

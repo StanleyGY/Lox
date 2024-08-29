@@ -47,7 +47,7 @@ func (p *AstPrinter) VisitPrintStmt(stmt *PrintStmt) error {
 }
 
 func (p *AstPrinter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
-	p.parenthesis("let", stmt.Initializer)
+	p.parenthesis("assign", stmt.Initializer)
 	return nil
 }
 
@@ -73,6 +73,7 @@ func (p *AstPrinter) VisitIfStmt(stmt *IfStmt) error {
 
 func (p *AstPrinter) VisitWhileStmt(stmt *WhileStmt) error {
 	// TODO: add ast printer
+	// p.parenthesis("while", stmt.Condition, )
 	return nil
 }
 
@@ -109,14 +110,17 @@ func (p *AstPrinter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 }
 
 func (p *AstPrinter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
+	p.parenthesis("call", append([]Expr{expr.Callee}, expr.Arguments...)...)
 	return nil, nil
 }
 
 func (p *AstPrinter) VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, error) {
+	p.parenthesis("get-prop", expr.Object, &LiteralExpr{expr.Property.Lexeme})
 	return nil, nil
 }
 
 func (p *AstPrinter) VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, error) {
+	p.parenthesis("set-prop", expr.Object, &LiteralExpr{expr.Property.Lexeme}, expr.Value)
 	return nil, nil
 }
 
