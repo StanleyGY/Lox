@@ -724,5 +724,8 @@ func (p *RDParser) primary() (Expr, error) {
 	if p.advanceIfMatch(Identifier) {
 		return &VariableExpr{Name: p.previous()}, nil
 	}
+	if p.advanceIfMatch(This) {
+		return &ThisExpr{}, nil
+	}
 	return nil, p.emitParsingError("expect a valid primary expr")
 }

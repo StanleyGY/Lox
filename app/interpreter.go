@@ -233,7 +233,11 @@ func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 }
 
 func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
-	// A function closure is the runtime environment when the function is declared
+	// Things about closure:
+	// For a function, closure is the runtime environment when the function is declared
+	// For a method, closure is the runtime environment when the method is declared
+	//					and a "this" property when the class is instantiated
+
 	loxFunc := &LoxFunction{Declaration: stmt, Closure: p.CurrEnv}
 	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, loxFunc) {
 		return &RuntimeError{Reason: fmt.Sprintf("double declaration for function: %s", stmt.Name.Lexeme)}
@@ -242,7 +246,12 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 }
 
 func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
-	klass := &LoxClass{Name: stmt.Name.Lexeme}
+	var methods []*LoxFunction
+	for _, funcStmt := range stmt.Methods {
+		methods = append(methods, &LoxFunction{Declaration: funcStmt, Closure: p.CurrEnv})
+	}
+
+	klass := &LoxClass{Name: stmt.Name.Lexeme, Methods: methods}
 	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, klass) {
 		return &RuntimeError{Reason: fmt.Sprintf("double declaration for class: %s", stmt.Name.Lexeme)}
 	}
@@ -442,7 +451,6 @@ func (p *Interpreter) VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, 
 	if val, ok = loxInstance.Properties[expr.Property.Lexeme]; !ok {
 		return nil, &RuntimeError{fmt.Sprintf("class %s does not have the field %s", loxInstance.Class, expr.Property.Lexeme)}
 	}
-
 	return val, nil
 }
 
@@ -480,6 +488,14 @@ func (p *Interpreter) VisitVariableExpr(expr *VariableExpr) (interface{}, error)
 	val, ok := p.CurrEnv.FindBinding(expr.Name.Lexeme, p.ScopeHops[expr])
 	if !ok {
 		return nil, &RuntimeError{Reason: fmt.Sprintf("reference an undefined variable: %s", expr.Name.Lexeme)}
+	}
+	return val, nil
+}
+
+func (p *Interpreter) VisitThisExpr(expr *ThisExpr) (interface{}, error) {
+	val, ok := p.CurrEnv.FindBinding("this", p.ScopeHops[expr])
+	if !ok {
+		return nil, &RuntimeError{Reason: "reference an unbounded \"this\""}
 	}
 	return val, nil
 }

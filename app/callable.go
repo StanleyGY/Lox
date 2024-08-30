@@ -39,10 +39,7 @@ func (f *LoxFunction) Call(interpreter *Interpreter, args []Expr) (interface{}, 
 
 	lastEnv := interpreter.CurrEnv
 	interpreter.CurrEnv = env
-
-	defer func() {
-		interpreter.CurrEnv = lastEnv
-	}()
+	defer func() { interpreter.CurrEnv = lastEnv }()
 
 	if err = f.Declaration.Body.Accept(interpreter); err != nil {
 		if returnVal, ok = err.(*RuntimeReturn); ok {
@@ -54,17 +51,13 @@ func (f *LoxFunction) Call(interpreter *Interpreter, args []Expr) (interface{}, 
 	return nil, nil
 }
 
-// func (f *LoxFunction) Closure() *Environment {
-// 	return f.Klosure
-// }
-
 func (f *LoxFunction) Arity() int {
 	return len(f.Declaration.Params)
 }
 
 type LoxClass struct {
 	Name    string
-	Methods []*FuncDeclStmt
+	Methods []*LoxFunction
 }
 
 func (c *LoxClass) Call(interpreter *Interpreter, args []Expr) (interface{}, error) {
@@ -87,10 +80,20 @@ type LoxClassInstance struct {
 }
 
 func MakeLoxClassInstance(klass *LoxClass) *LoxClassInstance {
-	return &LoxClassInstance{
+	properties := make(map[string]interface{})
+
+	instance := &LoxClassInstance{
 		Class:      klass,
-		Properties: make(map[string]interface{}),
+		Properties: properties,
 	}
+
+	for _, method := range klass.Methods {
+		name := method.Declaration.Name.Lexeme
+		properties[name] = method
+
+		method.Closure.CreateBinding("this", instance)
+	}
+	return instance
 }
 
 func (i LoxClassInstance) String() string {

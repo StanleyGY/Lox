@@ -180,6 +180,12 @@ func (e *SetPropertyExpr) Accept(v ExprVisitor) (interface{}, error) {
 	return v.VisitSetPropertyExpr(e)
 }
 
+type ThisExpr struct{}
+
+func (e *ThisExpr) Accept(v ExprVisitor) (interface{}, error) {
+	return v.VisitThisExpr(e)
+}
+
 type StmtVisitor interface {
 	VisitVarDeclStmt(stmt *VarDeclStmt) error
 	VisitFunDeclStmt(stmt *FuncDeclStmt) error
@@ -203,4 +209,5 @@ type ExprVisitor interface {
 	VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, error)
 	VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, error)
 	VisitVariableExpr(expr *VariableExpr) (interface{}, error)
+	VisitThisExpr(expr *ThisExpr) (interface{}, error)
 }

@@ -7,6 +7,8 @@ import (
 
 // Resolver performs the semantic analysis that resolves a variable always to the same declaration,
 // by calculating number of "hops" away the declared variable will be in the environment chain.
+//
+// An example chain of scopes: Global -> Block -> Class Decl -> Class Method
 type Resolver struct {
 	scopes     []map[string]bool
 	intepreter *Interpreter
@@ -104,6 +106,16 @@ func (r *Resolver) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 		return &SemanticsError{fmt.Sprintf("redefining class: %s", stmt.Name.Lexeme)}
 	}
 	r.define(stmt.Name.Lexeme)
+
+	r.beginScope()
+	r.declare("this")
+	r.define("this")
+	for _, method := range stmt.Methods {
+		if err := method.Accept(r); err != nil {
+			return err
+		}
+	}
+	r.endScope()
 	return nil
 }
 
@@ -251,6 +263,15 @@ func (r *Resolver) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
 	dist, defined := r.searchScopes(expr.Name.Lexeme)
 	if !defined {
 		return nil, &SemanticsError{Reason: fmt.Sprintf("undefined variable: %s", expr.Name.Lexeme)}
+	}
+	r.intepreter.Resolve(expr, dist)
+	return nil, nil
+}
+
+func (r *Resolver) VisitThisExpr(expr *ThisExpr) (interface{}, error) {
+	dist, defined := r.searchScopes("this")
+	if !defined {
+		return nil, &SemanticsError{Reason: "unbound \"this\""}
 	}
 	r.intepreter.Resolve(expr, dist)
 	return nil, nil

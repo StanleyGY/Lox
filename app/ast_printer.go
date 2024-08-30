@@ -152,3 +152,8 @@ func (p *AstPrinter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) 
 	p.buf.WriteString(expr.Name.Lexeme)
 	return nil, nil
 }
+
+func (p *AstPrinter) VisitThisExpr(expr *ThisExpr) (interface{}, error) {
+	p.buf.WriteString("this")
+	return nil, nil
+}
