@@ -1,4 +1,7 @@
 class Water {
+    init(vol) {
+        this.vol = vol;
+    }
     pour(incr){
         this.vol = this.vol + incr;
     }
@@ -7,20 +10,22 @@ class Water {
 class Density {
 }
 
-var water = Water();
+var water = Water(10);
 var density = Density();
 
 water.density = density;
 water.density.val = 1;
 
 print water;
+
 print water.density;
 print water.density.val;
 
-water.vol = 1;
 water.pour(1);
 print water.vol;
+print water.init(4); // call constructor again
 
+print "====";
 print "Test dynamically assigning a function to an instance";
 fun dump() {
     print "dump() called";

@@ -9,13 +9,13 @@ type LoxCallable interface {
 }
 
 type LoxFunction struct {
-	Closure     *Environment
-	Declaration *FuncDeclStmt
+	IsInitializer bool
+	Closure       *Environment
+	Declaration   *FuncDeclStmt
 }
 
 func (f *LoxFunction) Call(interpreter *Interpreter, args []Expr) (interface{}, error) {
 	var err error
-	var ok bool
 
 	// Create a new env for the function call
 	env := &Environment{
@@ -36,16 +36,25 @@ func (f *LoxFunction) Call(interpreter *Interpreter, args []Expr) (interface{}, 
 
 	// Evaluate function body
 	var returnVal *RuntimeReturn
+	var hasReturn bool
 
 	lastEnv := interpreter.CurrEnv
 	interpreter.CurrEnv = env
 	defer func() { interpreter.CurrEnv = lastEnv }()
 
 	if err = f.Declaration.Body.Accept(interpreter); err != nil {
-		if returnVal, ok = err.(*RuntimeReturn); ok {
-			return returnVal.Value, nil
+		if returnVal, hasReturn = err.(*RuntimeReturn); !hasReturn {
+			return nil, err
 		}
-		return nil, err
+	}
+	if f.IsInitializer {
+		// In case user calls the init() function explicitly,
+		// force rewrite the return value of an initializer to the instance itself.
+		instance, _ := f.Closure.FindBinding("this", 0)
+		return instance, nil
+	}
+	if hasReturn {
+		return returnVal.Value, nil
 	}
 	// In case there's no return value, return a nil to caller
 	return nil, nil
@@ -56,18 +65,40 @@ func (f *LoxFunction) Arity() int {
 }
 
 type LoxClass struct {
-	Name    string
-	Methods []*LoxFunction
+	Name        string
+	Initializer *LoxFunction
+	Methods     []*LoxFunction
 }
 
 func (c *LoxClass) Call(interpreter *Interpreter, args []Expr) (interface{}, error) {
-	// Create an instance of the class
-	return MakeLoxClassInstance(c), nil
+	// Create axn instance of the class
+	properties := make(map[string]interface{})
+
+	instance := &LoxClassInstance{
+		Class:      c,
+		Properties: properties,
+	}
+
+	// Bind methods as instance properties
+	for _, method := range c.Methods {
+		name := method.Declaration.Name.Lexeme
+		properties[name] = method
+		method.Closure.CreateBinding("this", instance)
+	}
+
+	// Immediately call the user-defined constructor
+	if c.Initializer != nil {
+		c.Initializer.Call(interpreter, args)
+	}
+	return instance, nil
 }
 
 func (c *LoxClass) Arity() int {
-	// For now, constructor doesn't take any parameter
-	return 0
+	// The arity of class is determined by the number of arguments accepted in constructor
+	if c.Initializer == nil {
+		return 0
+	}
+	return c.Initializer.Arity()
 }
 
 func (c LoxClass) String() string {
@@ -79,23 +110,6 @@ type LoxClassInstance struct {
 	Properties map[string]interface{}
 }
 
-func MakeLoxClassInstance(klass *LoxClass) *LoxClassInstance {
-	properties := make(map[string]interface{})
-
-	instance := &LoxClassInstance{
-		Class:      klass,
-		Properties: properties,
-	}
-
-	for _, method := range klass.Methods {
-		name := method.Declaration.Name.Lexeme
-		properties[name] = method
-
-		method.Closure.CreateBinding("this", instance)
-	}
-	return instance
-}
-
-func (i LoxClassInstance) String() string {
-	return fmt.Sprintf("instance <%p> (class %s)", &i, i.Class.String())
+func (i *LoxClassInstance) String() string {
+	return fmt.Sprintf("%s object at <%p>", i.Class.String(), i)
 }

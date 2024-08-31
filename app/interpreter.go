@@ -237,7 +237,6 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	// For a function, closure is the runtime environment when the function is declared
 	// For a method, closure is the runtime environment when the method is declared
 	//					and a "this" property when the class is instantiated
-
 	loxFunc := &LoxFunction{Declaration: stmt, Closure: p.CurrEnv}
 	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, loxFunc) {
 		return &RuntimeError{Reason: fmt.Sprintf("double declaration for function: %s", stmt.Name.Lexeme)}
@@ -246,12 +245,18 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 }
 
 func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
+	var initializer *LoxFunction
 	var methods []*LoxFunction
 	for _, funcStmt := range stmt.Methods {
-		methods = append(methods, &LoxFunction{Declaration: funcStmt, Closure: p.CurrEnv})
+		m := &LoxFunction{Declaration: funcStmt, Closure: p.CurrEnv, IsInitializer: false}
+		if funcStmt.Name.Lexeme == "init" {
+			initializer = m
+			m.IsInitializer = true
+		}
+		methods = append(methods, m)
 	}
 
-	klass := &LoxClass{Name: stmt.Name.Lexeme, Methods: methods}
+	klass := &LoxClass{Name: stmt.Name.Lexeme, Initializer: initializer, Methods: methods}
 	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, klass) {
 		return &RuntimeError{Reason: fmt.Sprintf("double declaration for class: %s", stmt.Name.Lexeme)}
 	}
