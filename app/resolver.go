@@ -10,8 +10,9 @@ import (
 //
 // An example chain of scopes: Global -> Block -> Class Decl -> Class Method
 type Resolver struct {
-	scopes     []map[string]bool
-	intepreter *Interpreter
+	scopes        []map[string]bool
+	intepreter    *Interpreter
+	enclosingFunc *FuncDeclStmt
 }
 
 type SemanticsError struct {
@@ -27,7 +28,7 @@ func (e SemanticsError) Error() string {
 
 func MakeResolver(interpreter *Interpreter) *Resolver {
 	scopes := []map[string]bool{make(map[string]bool)}
-	return &Resolver{scopes: scopes, intepreter: interpreter}
+	return &Resolver{scopes: scopes, intepreter: interpreter, enclosingFunc: nil}
 }
 
 func (r *Resolver) Resolve(stmts []Stmt) error {
@@ -90,6 +91,8 @@ func (r *Resolver) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	r.define(stmt.Name.Lexeme)
 
 	r.beginScope()
+	lastEnclosingFunc := r.enclosingFunc
+	r.enclosingFunc = stmt
 	for _, param := range stmt.Params {
 		r.declare(param.Lexeme)
 		r.define(param.Lexeme)
@@ -97,6 +100,7 @@ func (r *Resolver) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	if err := stmt.Body.Accept(r); err != nil {
 		return err
 	}
+	r.enclosingFunc = lastEnclosingFunc
 	r.endScope()
 	return nil
 }
@@ -108,7 +112,6 @@ func (r *Resolver) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 	r.define(stmt.Name.Lexeme)
 
 	r.beginScope()
-	r.declare("this")
 	r.define("this")
 	for _, method := range stmt.Methods {
 		if err := method.Accept(r); err != nil {
@@ -171,8 +174,18 @@ func (r *Resolver) VisitWhileStmt(stmt *WhileStmt) error {
 }
 
 func (r *Resolver) VisitReturnStmt(stmt *ReturnStmt) error {
-	if _, err := stmt.Value.Accept(r); err != nil {
-		return err
+	if r.enclosingFunc == nil {
+		return &SemanticsError{"return must be inside of a function"}
+	}
+
+	if stmt.Value != nil {
+		if r.enclosingFunc.Name.Lexeme == "init" {
+			// A init function declared in class should just be a return without value in code
+			return &SemanticsError{"class initializer should return nothing"}
+		}
+		if _, err := stmt.Value.Accept(r); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -266,8 +266,11 @@ func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 func (p *Interpreter) VisitReturnStmt(stmt *ReturnStmt) error {
 	var value interface{}
 	var err error
-	if value, err = stmt.Value.Accept(p); err != nil {
-		return err
+
+	if stmt.Value != nil {
+		if value, err = stmt.Value.Accept(p); err != nil {
+			return err
+		}
 	}
 	// Return an error to unwind the call stack until reaching CallExpr
 	return &RuntimeReturn{Value: value}

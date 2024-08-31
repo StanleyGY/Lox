@@ -1,6 +1,7 @@
 class Water {
     init(vol) {
         this.vol = vol;
+        return;
     }
     pour(incr){
         this.vol = this.vol + incr;

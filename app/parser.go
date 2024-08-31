@@ -465,13 +465,16 @@ func (p *RDParser) returnStmt() (Stmt, error) {
 	if !p.advanceIfMatch(Return) {
 		return nil, p.emitParsingError("missing \"return\" keyword")
 	}
-	if expr, err = p.expression(); err != nil {
-		return nil, err
-	}
 	if !p.advanceIfMatch(SemiColon) {
-		return nil, p.emitParsingError("return statement missing \";\"")
+		if expr, err = p.expression(); err != nil {
+			return nil, err
+		}
+		if !p.advanceIfMatch(SemiColon) {
+			return nil, p.emitParsingError("return statement missing \";\"")
+		}
+		return &ReturnStmt{Value: expr}, nil
 	}
-	return &ReturnStmt{Value: expr}, nil
+	return &ReturnStmt{}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {
