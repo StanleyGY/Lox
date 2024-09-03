@@ -44,9 +44,9 @@ func (e *FuncDeclStmt) Accept(v StmtVisitor) error {
 }
 
 type ClassDeclStmt struct {
-	Name      *Token
-	BaseClass *VariableExpr
-	Methods   []*FuncDeclStmt
+	Name       *Token
+	SuperClass *VariableExpr
+	Methods    []*FuncDeclStmt
 }
 
 func (e *ClassDeclStmt) Accept(v StmtVisitor) error {
@@ -187,6 +187,14 @@ func (e *ThisExpr) Accept(v ExprVisitor) (interface{}, error) {
 	return v.VisitThisExpr(e)
 }
 
+type SuperExpr struct {
+	Property *Token
+}
+
+func (e *SuperExpr) Accept(v ExprVisitor) (interface{}, error) {
+	return v.VisitSuperExpr(e)
+}
+
 type StmtVisitor interface {
 	VisitVarDeclStmt(stmt *VarDeclStmt) error
 	VisitFunDeclStmt(stmt *FuncDeclStmt) error
@@ -211,4 +219,5 @@ type ExprVisitor interface {
 	VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, error)
 	VisitVariableExpr(expr *VariableExpr) (interface{}, error)
 	VisitThisExpr(expr *ThisExpr) (interface{}, error)
+	VisitSuperExpr(expr *SuperExpr) (interface{}, error)
 }

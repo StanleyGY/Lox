@@ -10,9 +10,10 @@ import (
 //
 // An example chain of scopes: Global -> Block -> Class Decl -> Class Method
 type Resolver struct {
-	scopes        []map[string]bool
-	intepreter    *Interpreter
-	enclosingFunc *FuncDeclStmt
+	scopes         []map[string]bool
+	intepreter     *Interpreter
+	enclosingFunc  *FuncDeclStmt
+	enclosingClass *ClassDeclStmt
 }
 
 type SemanticsError struct {
@@ -109,14 +110,19 @@ func (r *Resolver) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 	if !r.declare(stmt.Name.Lexeme) {
 		return &SemanticsError{fmt.Sprintf("redefining class: %s", stmt.Name.Lexeme)}
 	}
-	if stmt.BaseClass != nil {
-		if _, err := stmt.BaseClass.Accept(r); err != nil {
-			return err
-		}
-	}
 	r.define(stmt.Name.Lexeme)
 
+	lastEnclosingClass := r.enclosingClass
+	r.enclosingClass = stmt
+
+	if stmt.SuperClass != nil {
+		if _, err := stmt.SuperClass.Accept(r); err != nil {
+			return err
+		}
+
+	}
 	r.beginScope()
+	r.define("super")
 	r.define("this")
 	for _, method := range stmt.Methods {
 		if err := method.Accept(r); err != nil {
@@ -124,6 +130,8 @@ func (r *Resolver) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 		}
 	}
 	r.endScope()
+
+	r.enclosingClass = lastEnclosingClass
 	return nil
 }
 
@@ -274,13 +282,13 @@ func (r *Resolver) VisitSetPropertyExpr(expr *SetPropertyExpr) (interface{}, err
 
 func (r *Resolver) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
 	if defined, declared := r.scopes[len(r.scopes)-1][expr.Name.Lexeme]; declared && !defined {
-		return nil, &SemanticsError{Reason: fmt.Sprintf("variable referencing itself in its own initializer: %s", expr.Name.Lexeme)}
+		return nil, &SemanticsError{fmt.Sprintf("variable referencing itself in its own initializer: %s", expr.Name.Lexeme)}
 	}
 
 	// Start from the innermost till the global scope, look for a matching name
 	dist, defined := r.searchScopes(expr.Name.Lexeme)
 	if !defined {
-		return nil, &SemanticsError{Reason: fmt.Sprintf("undefined variable: %s", expr.Name.Lexeme)}
+		return nil, &SemanticsError{fmt.Sprintf("undefined variable: %s", expr.Name.Lexeme)}
 	}
 	r.intepreter.Resolve(expr, dist)
 	return nil, nil
@@ -289,7 +297,21 @@ func (r *Resolver) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
 func (r *Resolver) VisitThisExpr(expr *ThisExpr) (interface{}, error) {
 	dist, defined := r.searchScopes("this")
 	if !defined {
-		return nil, &SemanticsError{Reason: "unbound \"this\""}
+		return nil, &SemanticsError{Reason: "ed \"this\""}
+	}
+	r.intepreter.Resolve(expr, dist)
+	return nil, nil
+}
+
+func (r *Resolver) VisitSuperExpr(expr *SuperExpr) (interface{}, error) {
+	// Resolve `super` as if it were a variable
+	dist, defined := r.searchScopes("super")
+	if !defined {
+		return nil, &SemanticsError{"unbounded \"super\""}
+	}
+	// Check if this class has a super class
+	if r.enclosingClass.SuperClass == nil {
+		return nil, &SemanticsError{"calling super on a class that doesn't have a super class"}
 	}
 	r.intepreter.Resolve(expr, dist)
 	return nil, nil

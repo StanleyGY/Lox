@@ -1,0 +1,19 @@
+class Liquid {
+    type() {
+        return "liquid";
+    }
+}
+
+class Water < Liquid{
+    type() {
+        return "water < " + super.type();
+    }
+}
+
+class Sparkling < Water {
+    type() {
+        return "Sparkling " + super.type();
+    }
+}
+
+print Sparkling().type();

@@ -1,10 +1,4 @@
-class Liquid {
-    type() {
-        print "liquid";
-    }
-}
-
-class Water < Liquid {
+class Water {
     init(vol) {
         this.vol = vol;
         return;
@@ -39,5 +33,4 @@ fun dump() {
 }
 water.dump = dump;
 water.dump();
-water.type();
 

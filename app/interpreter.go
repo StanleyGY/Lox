@@ -246,32 +246,53 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 
 func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 	var initializer *LoxFunction
-	var baseClass *LoxClass
+	var superClass *LoxClass
 
+	// Handle inheritance
+	if stmt.SuperClass != nil {
+		val, ok := p.CurrEnv.FindBinding(stmt.SuperClass.Name.Lexeme, p.ScopeHops[stmt.SuperClass])
+		if !ok {
+			return &RuntimeError{fmt.Sprintf("super class is declared: %s", stmt.SuperClass.Name.Lexeme)}
+		}
+		if superClass, ok = val.(*LoxClass); !ok {
+			return &RuntimeError{fmt.Sprintf("super class is not a class: %s", stmt.SuperClass.Name.Lexeme)}
+		}
+	}
+
+	// Handle class methods
 	methods := make(map[string]*LoxFunction)
 	for _, funcStmt := range stmt.Methods {
-		m := &LoxFunction{Declaration: funcStmt, Closure: p.CurrEnv, IsInitializer: false}
+		// With super class, the environment chain of a method when it's called looks like this:
+		// Global -> Block -> Class Closure ("super", "this") -> Method env.
+		// Unlike "this" which is specific to individual class instances,
+		// "super" is shared across all instances. So we only bind once, and bind
+		// when class is declared.
+		closure := p.CurrEnv
+		if stmt.SuperClass != nil {
+			closure = &Environment{
+				ParentEnv: closure,
+				Bindings:  make(map[string]interface{}),
+			}
+			closure.CreateBinding("super", superClass)
+		}
+
+		m := &LoxFunction{Declaration: funcStmt, Closure: closure, IsInitializer: false}
 		mName := funcStmt.Name.Lexeme
+		methods[mName] = m
+
 		if mName == "init" {
 			initializer = m
 			m.IsInitializer = true
 		}
-		methods[mName] = m
 	}
-
-	if stmt.BaseClass != nil {
-		val, ok := p.CurrEnv.FindBinding(stmt.BaseClass.Name.Lexeme, p.ScopeHops[stmt.BaseClass])
-		if !ok {
-			return &RuntimeError{fmt.Sprintf("base class is declared: %s", stmt.BaseClass.Name.Lexeme)}
-		}
-		if baseClass, ok = val.(*LoxClass); !ok {
-			return &RuntimeError{fmt.Sprintf("base class is not a class: %s", stmt.BaseClass.Name.Lexeme)}
-		}
-	}
-
-	klass := &LoxClass{Name: stmt.Name.Lexeme, BaseClass: baseClass, Initializer: initializer, Methods: methods}
 
 	// Try create a binding for the class decl
+	klass := &LoxClass{
+		Name:        stmt.Name.Lexeme,
+		SuperClass:  superClass,
+		Initializer: initializer,
+		Methods:     methods,
+	}
 	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, klass) {
 		return &RuntimeError{fmt.Sprintf("double declaration for class: %s", stmt.Name.Lexeme)}
 	}
@@ -523,4 +544,25 @@ func (p *Interpreter) VisitThisExpr(expr *ThisExpr) (interface{}, error) {
 		return nil, &RuntimeError{Reason: "reference an unbounded \"this\""}
 	}
 	return val, nil
+}
+
+func (p *Interpreter) VisitSuperExpr(expr *SuperExpr) (interface{}, error) {
+	// When `SuperExpr` is evaluated, we must be in a declaration body of a method
+	val, ok := p.CurrEnv.FindBinding("super", p.ScopeHops[expr])
+	if !ok {
+		return nil, &RuntimeError{Reason: "reference an unbounded \"super\""}
+	}
+	superClass, ok := val.(*LoxClass)
+	if !ok {
+		return nil, &RuntimeError{Reason: "super does not refer to a class"}
+	}
+	method, ok := superClass.FindMethod(expr.Property.Lexeme)
+	if !ok {
+		return nil, &RuntimeError{fmt.Sprintf("super class does not have this method: %s", expr.Property.Lexeme)}
+	}
+
+	// When a super method is called, it's still binded to the current instance
+	thisInstance, _ := p.CurrEnv.FindBinding("this", p.ScopeHops[expr]-1)
+	method.Bind("this", thisInstance)
+	return method, nil
 }

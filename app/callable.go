@@ -70,7 +70,7 @@ func (f *LoxFunction) Bind(name string, val interface{}) {
 
 type LoxClass struct {
 	Name        string
-	BaseClass   *LoxClass
+	SuperClass  *LoxClass
 	Initializer *LoxFunction
 	Methods     map[string]*LoxFunction
 }
@@ -131,8 +131,8 @@ func (i *LoxClassInstance) FindProperty(name string) (interface{}, bool) {
 	}
 
 	// Try get from super class
-	if i.Class.BaseClass != nil {
-		if val, ok = i.Class.BaseClass.FindMethod(name); ok {
+	if i.Class.SuperClass != nil {
+		if val, ok = i.Class.SuperClass.FindMethod(name); ok {
 			return val, true
 		}
 	}

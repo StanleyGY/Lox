@@ -36,7 +36,7 @@ Use right-associative notations:
 	unary          → (( "!" | "-" ) unary) | call
 	call           → primary ( "(" arguments? ")" | "." IDENTIFIER )*
 	arguments      → expression ( "," expression )*
-	primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
+	primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER | "super" "." IDENTIFIER
 */
 
 const (
@@ -224,7 +224,7 @@ func (p *RDParser) function() (*FuncDeclStmt, error) {
 
 func (p *RDParser) classDecl() (Stmt, error) {
 	var name *Token
-	var baseClass *VariableExpr
+	var superClass *VariableExpr
 	var methods []*FuncDeclStmt
 	var err error
 
@@ -238,11 +238,11 @@ func (p *RDParser) classDecl() (Stmt, error) {
 
 	if p.advanceIfMatch(Less) {
 		if !p.advanceIfMatch(Identifier) {
-			return nil, p.emitParsingError("class declaration missing base class")
+			return nil, p.emitParsingError("class declaration missing super class")
 		}
 		// Wrap this additionally in an expr so semantic analysis
 		// can be done on this identifier
-		baseClass = &VariableExpr{p.previous()}
+		superClass = &VariableExpr{p.previous()}
 	}
 	if !p.advanceIfMatch(LeftBrace) {
 		return nil, p.emitParsingError("class declaration missing \"{\"")
@@ -254,7 +254,7 @@ func (p *RDParser) classDecl() (Stmt, error) {
 		}
 		methods = append(methods, m)
 	}
-	return &ClassDeclStmt{Name: name, BaseClass: baseClass, Methods: methods}, nil
+	return &ClassDeclStmt{Name: name, SuperClass: superClass, Methods: methods}, nil
 }
 
 func (p *RDParser) parameters() ([]*Token, error) {
@@ -735,6 +735,15 @@ func (p *RDParser) primary() (Expr, error) {
 	}
 	if p.advanceIfMatch(This) {
 		return &ThisExpr{}, nil
+	}
+	if p.advanceIfMatch(Super) {
+		if !p.advanceIfMatch(Dot) {
+			return nil, p.emitParsingError("super missing a \".\"")
+		}
+		if !p.advanceIfMatch(Identifier) {
+			return nil, p.emitParsingError("super missing an identifier")
+		}
+		return &SuperExpr{Property: p.previous()}, nil
 	}
 	return nil, p.emitParsingError("expect a valid primary expr")
 }

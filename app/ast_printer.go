@@ -157,3 +157,7 @@ func (p *AstPrinter) VisitThisExpr(expr *ThisExpr) (interface{}, error) {
 	p.buf.WriteString("this")
 	return nil, nil
 }
+
+func (p *AstPrinter) VisitSuperExpr(expr *SuperExpr) (interface{}, error) {
+	return nil, nil
+}
