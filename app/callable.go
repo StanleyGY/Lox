@@ -31,7 +31,7 @@ func (f *LoxFunction) Call(interpreter *Interpreter, args []Expr) (interface{}, 
 			return nil, err
 		}
 		param = f.Declaration.Params[idx].Lexeme
-		env.CreateBinding(param, argv)
+		env.CreateBinding(param, argv, true)
 	}
 
 	// Evaluate function body
@@ -64,10 +64,6 @@ func (f *LoxFunction) Arity() int {
 	return len(f.Declaration.Params)
 }
 
-func (f *LoxFunction) Bind(name string, val interface{}) {
-	f.Closure.UpdateBinding(name, val, true)
-}
-
 type LoxClass struct {
 	Name        string
 	SuperClass  *LoxClass
@@ -91,7 +87,7 @@ func (c *LoxClass) Call(interpreter *Interpreter, args []Expr) (interface{}, err
 
 	// Immediately call the user-defined constructor
 	if c.Initializer != nil {
-		c.Initializer.Bind("this", instance)
+		c.Initializer.Closure.CreateBinding("this", instance, true)
 		c.Initializer.Call(interpreter, args)
 	}
 	return instance, nil
@@ -126,7 +122,7 @@ func (i *LoxClassInstance) FindProperty(name string) (interface{}, bool) {
 	// Try get an instance class methods (shared by all class instances)
 	if val, ok = i.Class.FindMethod(name); ok {
 		f := val.(*LoxFunction)
-		f.Bind("this", i)
+		f.Closure.CreateBinding("this", i, true)
 		return val, true
 	}
 

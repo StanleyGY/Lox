@@ -16,7 +16,7 @@ Use right-associative notations:
 	function       → IDENTIFIER "(" parameters? ")" block
 	parameters     → IDENTIFIER ( "," IDENTIFIER )*
 
-	statement      → block | exprStmt | printStmt | ifStmt | forStmt | whileStmt | returnStmt
+	statement      → block | exprStmt | printStmt | ifStmt | forStmt | whileStmt | returnStmt | breakStmt
 	block 		   → "{" declaration* "}"
 	exprStmt       → expression ";"
 	printStmt      → "print" expression ";"
@@ -24,6 +24,7 @@ Use right-associative notations:
 	forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) | expression? ";" expression? ")" statement
 	whileStmt      → "while" "(" expression ")" statement
 	returnStmt     → "return" expression? ";"
+	breakStmt      → "break" ";"
 
 	expression     → assignment
 	assignment     → ( call "." )? IDENTIFIER "=" assignment | logic_or
@@ -294,7 +295,10 @@ func (p *RDParser) statement() (Stmt, error) {
 	if p.match(Return) {
 		return p.returnStmt()
 	}
-	return p.expressionStatement()
+	if p.match(Break) {
+		return p.breakStmt()
+	}
+	return p.expressionStmt()
 }
 
 func (p *RDParser) printStmt() (Stmt, error) {
@@ -313,7 +317,7 @@ func (p *RDParser) printStmt() (Stmt, error) {
 	return &PrintStmt{Child: expr}, nil
 }
 
-func (p *RDParser) expressionStatement() (Stmt, error) {
+func (p *RDParser) expressionStmt() (Stmt, error) {
 	var expr Expr
 	var err error
 
@@ -415,12 +419,12 @@ func (p *RDParser) forStmt() (Stmt, error) {
 		return nil, p.emitParsingError("for loop missing \"(\"")
 	}
 	// Initializer clause
-	if p.advanceIfMatch(Var) {
+	if p.match(Var) {
 		if initializer, err = p.varDecl(); err != nil {
 			return nil, err
 		}
 	} else if !p.advanceIfMatch(SemiColon) {
-		if initializer, err = p.expressionStatement(); err != nil {
+		if initializer, err = p.expressionStmt(); err != nil {
 			return nil, err
 		}
 	}
@@ -481,6 +485,16 @@ func (p *RDParser) returnStmt() (Stmt, error) {
 		return &ReturnStmt{Value: expr}, nil
 	}
 	return &ReturnStmt{}, nil
+}
+
+func (p *RDParser) breakStmt() (Stmt, error) {
+	if !p.advanceIfMatch(Break) {
+		return nil, p.emitParsingError("missing \"break\" keyword")
+	}
+	if !p.advanceIfMatch(SemiColon) {
+		return nil, p.emitParsingError("break statement missing \";\"")
+	}
+	return &BreakStmt{}, nil
 }
 
 func (p *RDParser) expression() (Expr, error) {

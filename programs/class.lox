@@ -18,7 +18,6 @@ water.density = density;
 water.density.val = 1;
 
 print water;
-
 print water.density;
 print water.density.val;
 
@@ -26,11 +25,9 @@ water.pour(1);
 print water.vol;
 print water.init(4); // call constructor again
 
-print "====";
-print "Test dynamically assigning a function to an instance";
 fun dump() {
     print "dump() called";
 }
-water.dump = dump;
-water.dump();
+water.pour = dump;
+water.pour();
 

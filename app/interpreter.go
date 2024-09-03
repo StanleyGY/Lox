@@ -40,7 +40,13 @@ type RuntimeReturn struct {
 }
 
 func (e RuntimeReturn) Error() string {
-	return ""
+	return "runtime error: return"
+}
+
+type RuntimeBreak struct{}
+
+func (e RuntimeBreak) Error() string {
+	return "runtime error: break"
 }
 
 type Environment struct {
@@ -49,8 +55,8 @@ type Environment struct {
 }
 
 // CreateBinding creates a new binding in the current scope
-func (e *Environment) CreateBinding(name string, val interface{}) bool {
-	if _, ok := e.Bindings[name]; ok {
+func (e *Environment) CreateBinding(name string, val interface{}, update bool) bool {
+	if _, ok := e.Bindings[name]; ok && !update {
 		return false
 	}
 	e.Bindings[name] = val
@@ -66,19 +72,18 @@ func (e *Environment) FindBinding(name string, dist int) (interface{}, bool) {
 	return val, ok
 }
 
-// UpdateBinding searches for a binding, starting from the nearest scope
-// and updates the value. If `upsert` is true, this method behaves the same
-// as `CreateBinding`. If there's no binding in any scope, it returns false.
-func (e *Environment) UpdateBinding(name string, val interface{}, upsert bool) bool {
-	_, ok := e.Bindings[name]
-	if ok || upsert {
-		e.Bindings[name] = val
-		return true
+func (e *Environment) UpdateBinding(name string, val interface{}, dist int) bool {
+	ancestorEnv := e
+	for i := 0; i < dist; i++ {
+		ancestorEnv = ancestorEnv.ParentEnv
 	}
-	if e.ParentEnv == nil {
+	_, ok := ancestorEnv.Bindings[name]
+	if !ok {
 		return false
 	}
-	return e.ParentEnv.UpdateBinding(name, val, true)
+
+	ancestorEnv.Bindings[name] = val
+	return true
 }
 
 type Interpreter struct {
@@ -181,6 +186,9 @@ func (p *Interpreter) VisitWhileStmt(stmt *WhileStmt) error {
 			return nil
 		}
 		if err = stmt.Body.Accept(p); err != nil {
+			if _, ok := err.(*RuntimeBreak); ok {
+				return nil
+			}
 			return err
 		}
 	}
@@ -192,6 +200,7 @@ func (p *Interpreter) VisitBlockStmt(stmt *BlockStmt) error {
 		Bindings:  make(map[string]interface{}),
 	}
 	p.CurrEnv = newEnv
+	defer func() { p.CurrEnv = newEnv.ParentEnv }()
 
 	for _, c := range stmt.Stmts {
 		if err := c.Accept(p); err != nil {
@@ -199,7 +208,6 @@ func (p *Interpreter) VisitBlockStmt(stmt *BlockStmt) error {
 		}
 	}
 
-	p.CurrEnv = newEnv.ParentEnv
 	return nil
 }
 
@@ -226,7 +234,7 @@ func (p *Interpreter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
 	if val, err = stmt.Initializer.Accept(p); err != nil {
 		return err
 	}
-	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, val) {
+	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, val, false) {
 		return &RuntimeError{Reason: fmt.Sprintf("double declaration for variable: %s", stmt.Name.Lexeme)}
 	}
 	return nil
@@ -238,7 +246,7 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 	// For a method, closure is the runtime environment when the method is declared
 	//					and a "this" property when the class is instantiated
 	loxFunc := &LoxFunction{Declaration: stmt, Closure: p.CurrEnv}
-	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, loxFunc) {
+	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, loxFunc, false) {
 		return &RuntimeError{Reason: fmt.Sprintf("double declaration for function: %s", stmt.Name.Lexeme)}
 	}
 	return nil
@@ -273,7 +281,7 @@ func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 				ParentEnv: closure,
 				Bindings:  make(map[string]interface{}),
 			}
-			closure.CreateBinding("super", superClass)
+			closure.CreateBinding("super", superClass, true)
 		}
 
 		m := &LoxFunction{Declaration: funcStmt, Closure: closure, IsInitializer: false}
@@ -293,7 +301,7 @@ func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 		Initializer: initializer,
 		Methods:     methods,
 	}
-	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, klass) {
+	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, klass, false) {
 		return &RuntimeError{fmt.Sprintf("double declaration for class: %s", stmt.Name.Lexeme)}
 	}
 	return nil
@@ -310,6 +318,11 @@ func (p *Interpreter) VisitReturnStmt(stmt *ReturnStmt) error {
 	}
 	// Return an error to unwind the call stack until reaching CallExpr
 	return &RuntimeReturn{Value: value}
+}
+
+func (p *Interpreter) VisitBreakStmt(stmt *BreakStmt) error {
+	// Return an error to unwind the call stack until reaching WhileStmt
+	return &RuntimeBreak{}
 }
 
 func (p *Interpreter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {
@@ -446,7 +459,7 @@ func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 
 	// Design choice: the variable must be defined in the current scope
 	// before assigning another value
-	if !p.CurrEnv.UpdateBinding(expr.Name.Lexeme, val, false) {
+	if !p.CurrEnv.UpdateBinding(expr.Name.Lexeme, val, p.ScopeHops[expr]) {
 		return nil, &RuntimeError{Reason: fmt.Sprintf("assigns value to an undefined variable: %s", expr.Name.Lexeme)}
 	}
 	return nil, nil
@@ -563,6 +576,6 @@ func (p *Interpreter) VisitSuperExpr(expr *SuperExpr) (interface{}, error) {
 
 	// When a super method is called, it's still binded to the current instance
 	thisInstance, _ := p.CurrEnv.FindBinding("this", p.ScopeHops[expr]-1)
-	method.Bind("this", thisInstance)
+	method.Closure.CreateBinding("this", thisInstance, true)
 	return method, nil
 }

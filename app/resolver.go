@@ -14,6 +14,7 @@ type Resolver struct {
 	intepreter     *Interpreter
 	enclosingFunc  *FuncDeclStmt
 	enclosingClass *ClassDeclStmt
+	enclosingLoop  *WhileStmt
 }
 
 type SemanticsError struct {
@@ -180,9 +181,12 @@ func (r *Resolver) VisitWhileStmt(stmt *WhileStmt) error {
 	if _, err := stmt.Condition.Accept(r); err != nil {
 		return err
 	}
+	lastEnclosingLoop := r.enclosingLoop
+	r.enclosingLoop = stmt
 	if err := stmt.Body.Accept(r); err != nil {
 		return err
 	}
+	r.enclosingLoop = lastEnclosingLoop
 	return nil
 }
 
@@ -199,6 +203,13 @@ func (r *Resolver) VisitReturnStmt(stmt *ReturnStmt) error {
 		if _, err := stmt.Value.Accept(r); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (r *Resolver) VisitBreakStmt(stmt *BreakStmt) error {
+	if r.enclosingLoop == nil {
+		return &SemanticsError{"break must be in a loop"}
 	}
 	return nil
 }

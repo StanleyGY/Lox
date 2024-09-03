@@ -46,6 +46,7 @@ const (
 	Or
 	Print
 	Return
+	Break
 	Super
 	This
 	True
@@ -67,6 +68,7 @@ var reservedWords = map[string]int{
 	"or":     Or,
 	"print":  Print,
 	"return": Return,
+	"break":  Break,
 	"super":  Super,
 	"this":   This,
 	"true":   True,

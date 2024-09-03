@@ -7,6 +7,7 @@ import (
 	"strconv"
 )
 
+// TODO: make the printer more pretty
 type AstPrinter struct {
 	buf bytes.Buffer
 }
@@ -26,7 +27,9 @@ func (p *AstPrinter) PrettyPrintStmt(stmt Stmt) string {
 func (p *AstPrinter) parenthesis(name string, exprs ...Expr) {
 	p.buf.WriteString("(")
 	p.buf.WriteString(name)
-	p.buf.WriteString(" ")
+	if len(exprs) > 0 {
+		p.buf.WriteString(" ")
+	}
 	for idx, expr := range exprs {
 		expr.Accept(p)
 		if idx < len(exprs)-1 {
@@ -47,7 +50,7 @@ func (p *AstPrinter) VisitPrintStmt(stmt *PrintStmt) error {
 }
 
 func (p *AstPrinter) VisitVarDeclStmt(stmt *VarDeclStmt) error {
-	p.parenthesis("assign", stmt.Initializer)
+	p.parenthesis("assign", &LiteralExpr{stmt.Name.Lexeme}, stmt.Initializer)
 	return nil
 }
 
@@ -66,19 +69,29 @@ func (p *AstPrinter) VisitIfStmt(stmt *IfStmt) error {
 	stmt.Condition.Accept(p)
 	p.buf.WriteString("Then")
 	stmt.ThenBranch.Accept(p)
-	p.buf.WriteString("Else")
-	stmt.ElseBranch.Accept(p)
+	if stmt.ElseBranch != nil {
+		p.buf.WriteString("Else")
+		stmt.ElseBranch.Accept(p)
+	}
 	return nil
 }
 
 func (p *AstPrinter) VisitWhileStmt(stmt *WhileStmt) error {
-	// TODO: add ast printer
-	// p.parenthesis("while", stmt.Condition, )
+	p.buf.WriteString("(")
+	p.parenthesis("while", stmt.Condition)
+	stmt.Body.Accept(p)
+	p.buf.WriteString(")")
 	return nil
 }
 
 func (p *AstPrinter) VisitReturnStmt(stmt *ReturnStmt) error {
+	p.parenthesis("return", stmt.Value)
+	return nil
+}
+
+func (p *AstPrinter) VisitBreakStmt(stmt *BreakStmt) error {
 	// TODO: add ast printer
+	p.parenthesis("break")
 	return nil
 }
 
@@ -105,7 +118,7 @@ func (p *AstPrinter) VisitLogicalExpr(expr *LogicExpr) (interface{}, error) {
 }
 
 func (p *AstPrinter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
-	p.parenthesis("let", &LiteralExpr{expr.Name}, expr.Value)
+	p.parenthesis("let", &LiteralExpr{expr.Name.Lexeme}, expr.Value)
 	return nil, nil
 }
 

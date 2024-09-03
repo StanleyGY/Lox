@@ -73,12 +73,18 @@ func (e *WhileStmt) Accept(v StmtVisitor) error {
 }
 
 type ReturnStmt struct {
-	// TODO: Keyword *Token for error reporting
 	Value Expr
 }
 
 func (e *ReturnStmt) Accept(v StmtVisitor) error {
 	return v.VisitReturnStmt(e)
+}
+
+type BreakStmt struct {
+}
+
+func (e *BreakStmt) Accept(v StmtVisitor) error {
+	return v.VisitBreakStmt(e)
 }
 
 type BlockStmt struct {
@@ -205,6 +211,7 @@ type StmtVisitor interface {
 	VisitIfStmt(stmt *IfStmt) error
 	VisitWhileStmt(stmt *WhileStmt) error
 	VisitReturnStmt(stmt *ReturnStmt) error
+	VisitBreakStmt(stmt *BreakStmt) error
 }
 
 type ExprVisitor interface {
