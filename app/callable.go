@@ -64,10 +64,20 @@ func (f *LoxFunction) Arity() int {
 	return len(f.Declaration.Params)
 }
 
+func (f *LoxFunction) Bind(name string, val interface{}) {
+	f.Closure.UpdateBinding(name, val, true)
+}
+
 type LoxClass struct {
 	Name        string
+	BaseClass   *LoxClass
 	Initializer *LoxFunction
-	Methods     []*LoxFunction
+	Methods     map[string]*LoxFunction
+}
+
+func (c *LoxClass) FindMethod(name string) (*LoxFunction, bool) {
+	val, ok := c.Methods[name]
+	return val, ok
 }
 
 func (c *LoxClass) Call(interpreter *Interpreter, args []Expr) (interface{}, error) {
@@ -79,15 +89,9 @@ func (c *LoxClass) Call(interpreter *Interpreter, args []Expr) (interface{}, err
 		Properties: properties,
 	}
 
-	// Bind methods as instance properties
-	for _, method := range c.Methods {
-		name := method.Declaration.Name.Lexeme
-		properties[name] = method
-		method.Closure.CreateBinding("this", instance)
-	}
-
 	// Immediately call the user-defined constructor
 	if c.Initializer != nil {
+		c.Initializer.Bind("this", instance)
 		c.Initializer.Call(interpreter, args)
 	}
 	return instance, nil
@@ -108,6 +112,31 @@ func (c LoxClass) String() string {
 type LoxClassInstance struct {
 	Class      *LoxClass
 	Properties map[string]interface{}
+}
+
+func (i *LoxClassInstance) FindProperty(name string) (interface{}, bool) {
+	var val interface{}
+	var ok bool
+
+	// Try get an instance property (owned by individual instance)
+	if val, ok = i.Properties[name]; ok {
+		return val, true
+	}
+
+	// Try get an instance class methods (shared by all class instances)
+	if val, ok = i.Class.FindMethod(name); ok {
+		f := val.(*LoxFunction)
+		f.Bind("this", i)
+		return val, true
+	}
+
+	// Try get from super class
+	if i.Class.BaseClass != nil {
+		if val, ok = i.Class.BaseClass.FindMethod(name); ok {
+			return val, true
+		}
+	}
+	return nil, false
 }
 
 func (i *LoxClassInstance) String() string {

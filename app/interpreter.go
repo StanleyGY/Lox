@@ -67,18 +67,18 @@ func (e *Environment) FindBinding(name string, dist int) (interface{}, bool) {
 }
 
 // UpdateBinding searches for a binding, starting from the nearest scope
-// and updates the value. If there's no binding in any scope, it returns
-// false.
-func (e *Environment) UpdateBinding(name string, val interface{}) bool {
+// and updates the value. If `upsert` is true, this method behaves the same
+// as `CreateBinding`. If there's no binding in any scope, it returns false.
+func (e *Environment) UpdateBinding(name string, val interface{}, upsert bool) bool {
 	_, ok := e.Bindings[name]
-	if ok {
+	if ok || upsert {
 		e.Bindings[name] = val
 		return true
 	}
 	if e.ParentEnv == nil {
 		return false
 	}
-	return e.ParentEnv.UpdateBinding(name, val)
+	return e.ParentEnv.UpdateBinding(name, val, true)
 }
 
 type Interpreter struct {
@@ -246,19 +246,34 @@ func (p *Interpreter) VisitFunDeclStmt(stmt *FuncDeclStmt) error {
 
 func (p *Interpreter) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 	var initializer *LoxFunction
-	var methods []*LoxFunction
+	var baseClass *LoxClass
+
+	methods := make(map[string]*LoxFunction)
 	for _, funcStmt := range stmt.Methods {
 		m := &LoxFunction{Declaration: funcStmt, Closure: p.CurrEnv, IsInitializer: false}
-		if funcStmt.Name.Lexeme == "init" {
+		mName := funcStmt.Name.Lexeme
+		if mName == "init" {
 			initializer = m
 			m.IsInitializer = true
 		}
-		methods = append(methods, m)
+		methods[mName] = m
 	}
 
-	klass := &LoxClass{Name: stmt.Name.Lexeme, Initializer: initializer, Methods: methods}
+	if stmt.BaseClass != nil {
+		val, ok := p.CurrEnv.FindBinding(stmt.BaseClass.Name.Lexeme, p.ScopeHops[stmt.BaseClass])
+		if !ok {
+			return &RuntimeError{fmt.Sprintf("base class is declared: %s", stmt.BaseClass.Name.Lexeme)}
+		}
+		if baseClass, ok = val.(*LoxClass); !ok {
+			return &RuntimeError{fmt.Sprintf("base class is not a class: %s", stmt.BaseClass.Name.Lexeme)}
+		}
+	}
+
+	klass := &LoxClass{Name: stmt.Name.Lexeme, BaseClass: baseClass, Initializer: initializer, Methods: methods}
+
+	// Try create a binding for the class decl
 	if !p.CurrEnv.CreateBinding(stmt.Name.Lexeme, klass) {
-		return &RuntimeError{Reason: fmt.Sprintf("double declaration for class: %s", stmt.Name.Lexeme)}
+		return &RuntimeError{fmt.Sprintf("double declaration for class: %s", stmt.Name.Lexeme)}
 	}
 	return nil
 }
@@ -410,7 +425,7 @@ func (p *Interpreter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 
 	// Design choice: the variable must be defined in the current scope
 	// before assigning another value
-	if !p.CurrEnv.UpdateBinding(expr.Name.Lexeme, val) {
+	if !p.CurrEnv.UpdateBinding(expr.Name.Lexeme, val, false) {
 		return nil, &RuntimeError{Reason: fmt.Sprintf("assigns value to an undefined variable: %s", expr.Name.Lexeme)}
 	}
 	return nil, nil
@@ -456,8 +471,10 @@ func (p *Interpreter) VisitGetPropertyExpr(expr *GetPropertyExpr) (interface{}, 
 
 	// Access property from the Lox class instance
 	var val interface{}
-	if val, ok = loxInstance.Properties[expr.Property.Lexeme]; !ok {
-		return nil, &RuntimeError{fmt.Sprintf("class %s does not have the field %s", loxInstance.Class, expr.Property.Lexeme)}
+	name := expr.Property.Lexeme
+
+	if val, ok = loxInstance.FindProperty(name); !ok {
+		return nil, &RuntimeError{fmt.Sprintf("class %s does not have the field %s", loxInstance.Class, name)}
 	}
 	return val, nil
 }

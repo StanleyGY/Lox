@@ -109,6 +109,11 @@ func (r *Resolver) VisitClassDeclStmt(stmt *ClassDeclStmt) error {
 	if !r.declare(stmt.Name.Lexeme) {
 		return &SemanticsError{fmt.Sprintf("redefining class: %s", stmt.Name.Lexeme)}
 	}
+	if stmt.BaseClass != nil {
+		if _, err := stmt.BaseClass.Accept(r); err != nil {
+			return err
+		}
+	}
 	r.define(stmt.Name.Lexeme)
 
 	r.beginScope()

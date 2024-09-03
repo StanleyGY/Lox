@@ -10,7 +10,7 @@ Use right-associative notations:
 	program        → declaration* EOF
 
 	declaration    → classDecl | funDecl | varDecl | statement
-	classDecl      → "class" IDENTIFIER "{" function* "}"
+	classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}"
 	varDecl    	   → "var" IDENTIFIER ( "=" EXPRESSION )? ";"
 	funDecl        → "fun" function
 	function       → IDENTIFIER "(" parameters? ")" block
@@ -224,6 +224,7 @@ func (p *RDParser) function() (*FuncDeclStmt, error) {
 
 func (p *RDParser) classDecl() (Stmt, error) {
 	var name *Token
+	var baseClass *VariableExpr
 	var methods []*FuncDeclStmt
 	var err error
 
@@ -235,20 +236,25 @@ func (p *RDParser) classDecl() (Stmt, error) {
 	}
 	name = p.previous()
 
+	if p.advanceIfMatch(Less) {
+		if !p.advanceIfMatch(Identifier) {
+			return nil, p.emitParsingError("class declaration missing base class")
+		}
+		// Wrap this additionally in an expr so semantic analysis
+		// can be done on this identifier
+		baseClass = &VariableExpr{p.previous()}
+	}
 	if !p.advanceIfMatch(LeftBrace) {
 		return nil, p.emitParsingError("class declaration missing \"{\"")
 	}
-	for !p.match(RightBrace) {
+	for !p.advanceIfMatch(RightBrace) {
 		var m *FuncDeclStmt
 		if m, err = p.function(); err != nil {
 			return nil, err
 		}
 		methods = append(methods, m)
 	}
-	if !p.advanceIfMatch(RightBrace) {
-		return nil, p.emitParsingError("func declaration missing \"}\"")
-	}
-	return &ClassDeclStmt{Name: name, Methods: methods}, nil
+	return &ClassDeclStmt{Name: name, BaseClass: baseClass, Methods: methods}, nil
 }
 
 func (p *RDParser) parameters() ([]*Token, error) {

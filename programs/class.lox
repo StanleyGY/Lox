@@ -1,9 +1,15 @@
-class Water {
+class Liquid {
+    type() {
+        print "liquid";
+    }
+}
+
+class Water < Liquid {
     init(vol) {
         this.vol = vol;
         return;
     }
-    pour(incr){
+    pour(incr) {
         this.vol = this.vol + incr;
     }
 }
@@ -33,4 +39,5 @@ fun dump() {
 }
 water.dump = dump;
 water.dump();
+water.type();
 

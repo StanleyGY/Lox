@@ -44,8 +44,9 @@ func (e *FuncDeclStmt) Accept(v StmtVisitor) error {
 }
 
 type ClassDeclStmt struct {
-	Name    *Token
-	Methods []*FuncDeclStmt
+	Name      *Token
+	BaseClass *VariableExpr
+	Methods   []*FuncDeclStmt
 }
 
 func (e *ClassDeclStmt) Accept(v StmtVisitor) error {
