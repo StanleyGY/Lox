@@ -9,10 +9,20 @@ typedef double Value;
 /*
 Bytecode format:
     OP_CONSTANT const_idx
+    OP_NEGATE
     OP_RETURN
+    OP_ADD
+    OP_SUBTRACT
+    OP_MULTIPLY
+    OP_DIVIDE
 */
 enum OpCode {
     OP_CONSTANT,
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_MULTIPLY,
+    OP_DIVIDE,
+    OP_NEGATE,
     OP_RETURN,
 };
 
@@ -24,16 +34,19 @@ class Chunk {
 
     void addCode(uint8_t byte, int lineNo);
     auto addConstant(Value value) -> int;
-    void disassemble(const std::string& name);
 
-   private:
-    auto disassembleInstruction(int offset) -> int;
-    auto disassembleConstantInstruction(const std::string& name, int offset) -> int;
-    auto disassembleSimpleInstruction(const std::string& name, int offset) -> int;
+    void disassemble(const std::string& name) const;
+    auto disassembleInstruction(int offset) const -> int;
 
     std::vector<OpCode> code_;
-    std::vector<int> lines_;  // TODO: use run-length encoding of line numbers to save space
-    std::vector<Value> values_;
+    std::vector<Value> constants_;
+
+   private:
+    // TODO: use run-length encoding of line numbers to save space
+    std::vector<int> lines_;
+
+    auto disassembleConstantInstruction(const std::string& name, int offset) const -> int;
+    auto disassembleSimpleInstruction(const std::string& name, int offset) const -> int;
 };
 
 #endif
