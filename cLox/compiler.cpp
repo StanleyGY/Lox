@@ -13,6 +13,9 @@ Compiler::Compiler(const std::string &source) : source_(source), scanner_(Scanne
         {TOKEN_STAR, {nullptr, &Compiler::binary, PREC_FACTOR}},
         {TOKEN_SLASH, {nullptr, &Compiler::binary, PREC_FACTOR}},
         {TOKEN_NUMBER, {&Compiler::number, nullptr, PREC_NONE}},
+        {TOKEN_TRUE, {&Compiler::literal, nullptr, PREC_NONE}},
+        {TOKEN_FALSE, {&Compiler::literal, nullptr, PREC_NONE}},
+        {TOKEN_NIL, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_EOF, {nullptr, nullptr, PREC_NONE}},
     };
 }
@@ -147,6 +150,27 @@ void Compiler::grouping() {
 }
 
 void Compiler::number() {
-    Value value = std::stod(source_.substr(prevToken_->start_, prevToken_->length_));
-    emitConstant(value, prevToken_->lineNo_);
+    double value = std::stod(source_.substr(prevToken_->start_, prevToken_->length_));
+    // Store the number constant in a separate constant_ array because
+    // number cosntants can have billions of variants
+    emitConstant(Value{value}, prevToken_->lineNo_);
+}
+
+void Compiler::literal() {
+    // Technically, we can save execution time and space by not storing
+    // these literals in a separate constant_ array. So a more optimal solution
+    // is to emit a bytecode instruction.
+    switch (prevToken_->type_) {
+        case TOKEN_TRUE:
+            emitConstant(Value{true}, prevToken_->lineNo_);
+            break;
+        case TOKEN_FALSE:
+            emitConstant(Value{false}, prevToken_->lineNo_);
+            break;
+        case TOKEN_NIL:
+            emitConstant(Value{}, prevToken_->lineNo_);
+            break;
+        default:
+            throw CompilerException{"processing literal for invalid token"};
+    }
 }

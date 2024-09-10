@@ -14,15 +14,20 @@ enum InterpretResult {
 
 class VM {
    public:
-    VM() = default;
+    VM(const Chunk *chunk) : chunk_{chunk} {
+        ip_ = 0;
+    }
 
-    auto interpret(const Chunk *chunk) -> InterpretResult;
+    auto interpret() -> InterpretResult;
 
    private:
     auto readByte() -> int;
     void push(Value val);
     auto pop() -> Value;
+    auto peek(int dist) -> Value;
+
     void printStack();
+    void printRuntimeError(const std::string &message);
 
     const Chunk *chunk_;
     int ip_;

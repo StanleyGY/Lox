@@ -4,6 +4,7 @@
 #include "chunk.hpp"
 #include "token.hpp"
 #include "scanner.hpp"
+#include "value.hpp"
 #include <map>
 
 enum Precedence {
@@ -57,6 +58,7 @@ class Compiler {
     void unary();
     void grouping();
     void number();
+    void literal();
 
     using ParseFunc = void (Compiler::*)();
 

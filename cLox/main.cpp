@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(int argc, const char *argv[]) {
-    std::string source = "3 * (4 + 5)";
+    std::string source = "(-1 + 2) * 3 - -4 + true";
     Compiler compiler{source};
     Chunk chunk;
     try {

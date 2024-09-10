@@ -50,7 +50,17 @@ auto Chunk::disassembleInstruction(int offset) const -> int {
 
 auto Chunk::disassembleConstantInstruction(const std::string& name, int offset) const -> int {
     int idx = code_[offset + 1];
-    printf("%-16s %4d %g\n", name.c_str(), idx, constants_[idx]);
+    printf("%-16s %4d ", name.c_str(), idx);
+
+    auto c = constants_[idx];
+    if (c.isNumber()) {
+        printf("%g", c.asNumber());
+    } else if (c.isBool()) {
+        printf(c.isBool() ? "true" : "false");
+    } else {
+        printf("nil");
+    }
+    printf("\n");
     return offset + 2;
 }
 

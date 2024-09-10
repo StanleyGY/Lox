@@ -1,10 +1,8 @@
 #ifndef CHUNK_H
 #define CHUNK_H
 
+#include "value.hpp"
 #include <vector>
-
-// For now, only support double precision for constant value
-using Value = double;
 
 /*
 Bytecode format:
