@@ -13,7 +13,8 @@ class Scanner {
         current_ = 0;
         line_ = 0;
     }
-    auto scanTokens() -> std::vector<std::unique_ptr<Token>>;
+    auto scanToken() -> std::unique_ptr<Token>;
+    auto hasNext() -> bool;
 
    private:
     auto emitToken(TokenType type) -> std::unique_ptr<Token>;
@@ -23,7 +24,6 @@ class Scanner {
     auto scanNumber() -> std::unique_ptr<Token>;
     auto scanIdentifier() -> std::unique_ptr<Token>;
 
-    auto hasNext() -> bool;
     auto previous() -> char;
     auto current() -> char;
     auto next() -> char;

@@ -3,6 +3,7 @@
 
 #include "chunk.hpp"
 #include "token.hpp"
+#include "scanner.hpp"
 #include <map>
 
 enum Precedence {
@@ -21,8 +22,10 @@ enum Precedence {
 
 class CompilerException : std::exception {
    public:
-    CompilerException(std::string &&message) : message_{message} {
-        printf("%s\n", message.c_str());
+    CompilerException(std::string &&message) : message_{message} {}
+
+    virtual auto what() const throw() -> const char * {
+        return message_.c_str();
     }
 
    private:
@@ -36,10 +39,10 @@ class Compiler {
 
    private:
     auto hasNext() -> bool;
-    auto previous() -> const Token *;
-    auto current() -> const Token *;
+    // auto previous() -> const Token *;
+    // auto current() -> const Token *;
     auto match(TokenType t) -> bool;
-    auto advance() -> const Token *;
+    void advance();
     auto advanceIfMatch(TokenType t) -> bool;
     void consume(TokenType t, std::string &&message);
 
@@ -63,12 +66,16 @@ class Compiler {
         Precedence precedence;  // precedence for an infix operator
     };
 
-    int current_;
-    const std::string &source_;
     std::map<TokenType, Rule> parserRules_;
-    std::vector<std::unique_ptr<Token>> tokens_;
+
+    const std::string &source_;
+    Scanner scanner_;
+    std::unique_ptr<Token> prevToken_;
+    std::unique_ptr<Token> currToken_;
 
     Chunk chunk_;
+    // int current_;
+    // std::vector<std::unique_ptr<Token>> tokens_;
 };
 
 #endif

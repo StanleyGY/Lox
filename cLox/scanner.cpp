@@ -22,17 +22,13 @@ auto reservedWords = std::map<std::string, TokenType>{
     {"while", TOKEN_WHILE},
 };
 
-auto Scanner::scanTokens() -> std::vector<std::unique_ptr<Token>> {
-    std::vector<std::unique_ptr<Token>> tokens;
+auto Scanner::scanToken() -> std::unique_ptr<Token> {
+    std::unique_ptr<Token> token{nullptr};
 
     while (true) {
-        std::unique_ptr<Token> token{nullptr};
-
         start_ = current_;
-
         if (!hasNext()) {
-            tokens.emplace_back(emitToken(TOKEN_EOF));
-            break;
+            return emitToken(TOKEN_EOF);
         }
 
         char c = advance();
@@ -111,10 +107,9 @@ auto Scanner::scanTokens() -> std::vector<std::unique_ptr<Token>> {
         }
 
         if (token) {
-            tokens.emplace_back(std::move(token));
+            return token;
         }
     }
-    return tokens;
 }
 
 auto Scanner::emitToken(TokenType type) -> std::unique_ptr<Token> {
