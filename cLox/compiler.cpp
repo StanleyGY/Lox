@@ -1,196 +1,177 @@
 #include "compiler.hpp"
-
-#include <ctype.h>
-
+#include "scanner.hpp"
 #include <map>
+#include <string>
+#include <iostream>
+#include <sstream>
 
-auto reservedWords = std::map<std::string, TokenType>{
-    {"and", TOKEN_AND},
-    {"class", TOKEN_CLASS},
-    {"else", TOKEN_ELSE},
-    {"false", TOKEN_FALSE},
-    {"fun", TOKEN_FUN},
-    {"for", TOKEN_FOR},
-    {"if", TOKEN_IF},
-    {"nil", TOKEN_NIL},
-    {"or", TOKEN_OR},
-    {"print", TOKEN_PRINT},
-    {"return", TOKEN_RETURN},
-    {"super", TOKEN_SUPER},
-    {"this", TOKEN_THIS},
-    {"true", TOKEN_TRUE},
-    {"var", TOKEN_VAR},
-    {"while", TOKEN_WHILE},
-};
+Compiler::Compiler(const std::string &source) : source_(source) {
+    current_ = 0;
 
-auto Scanner::scanTokens() -> std::vector<std::unique_ptr<Token>> {
-    std::vector<std::unique_ptr<Token>> tokens;
-
-    while (true) {
-        std::unique_ptr<Token> token{nullptr};
-
-        start_ = current_;
-
-        if (!hasNext()) {
-            tokens.emplace_back(emitToken(TOKEN_EOF));
-            break;
-        }
-
-        char c = advance();
-        switch (c) {
-            case '(':
-                token = emitToken(TOKEN_LEFT_PAREN);
-                break;
-            case ')':
-                token = emitToken(TOKEN_RIGHT_PAREN);
-                break;
-            case '{':
-                token = emitToken(TOKEN_LEFT_BRACE);
-                break;
-            case '}':
-                token = emitToken(TOKEN_RIGHT_BRACE);
-                break;
-            case ';':
-                token = emitToken(TOKEN_SEMICOLON);
-                break;
-            case ',':
-                token = emitToken(TOKEN_COMMA);
-                break;
-            case '.':
-                token = emitToken(TOKEN_DOT);
-                break;
-            case '-':
-                token = emitToken(TOKEN_MINUS);
-                break;
-            case '+':
-                token = emitToken(TOKEN_PLUS);
-                break;
-            case '/':
-                if (match('/')) {
-                    // Skip comment
-                    while (hasNext() && advance() != '\n') {
-                        ;
-                    }
-                } else {
-                    token = emitToken(TOKEN_SLASH);
-                }
-                break;
-            case '*':
-                token = emitToken(TOKEN_STAR);
-                break;
-            case '!':
-                token = emitToken(advanceIfMatch('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-                break;
-            case '=':
-                token = emitToken(advanceIfMatch('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
-                break;
-            case '<':
-                token = emitToken(advanceIfMatch('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-                break;
-            case '>':
-                token = emitToken(advanceIfMatch('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
-                break;
-            case ' ':
-            case '\t':
-            case '\r':
-                break;
-            case '\n':
-                line_++;
-                break;
-            case '"':
-                token = scanString();
-                break;
-            default:
-                if (isdigit(peek())) {
-                    token = scanNumber();
-                } else if (isalpha(peek())) {
-                    token = scanIdentifier();
-                } else {
-                    token = emitErrorToken("unknown token");
-                }
-                break;
-        }
-
-        if (token) {
-            tokens.emplace_back(std::move(token));
-        }
-    }
-    return tokens;
+    parserRules_ = std::map<TokenType, Rule>{
+        {TOKEN_LEFT_PAREN, {&Compiler::grouping, nullptr, PREC_NONE}},
+        {TOKEN_RIGHT_PAREN, {nullptr, nullptr, PREC_NONE}},
+        {TOKEN_MINUS, {&Compiler::unary, &Compiler::binary, PREC_TERM}},
+        {TOKEN_PLUS, {nullptr, &Compiler::binary, PREC_TERM}},
+        {TOKEN_STAR, {nullptr, &Compiler::binary, PREC_FACTOR}},
+        {TOKEN_SLASH, {nullptr, &Compiler::binary, PREC_FACTOR}},
+        {TOKEN_NUMBER, {&Compiler::number, nullptr, PREC_NONE}},
+        {TOKEN_EOF, {nullptr, nullptr, PREC_NONE}},
+    };
 }
 
-auto Scanner::emitToken(TokenType type) -> std::unique_ptr<Token> {
-    return std::make_unique<Token>(type, start_, current_ - start_, line_);
+auto Compiler::compile() -> Chunk {
+    Scanner scanner{source_};
+    tokens_ = scanner.scanTokens();
+
+    // for (auto &token : tokens_) {
+    //     printf("%d: %d %d %s\n", token->type_, token->start_, token->length_, source_.substr(token->start_, token->length_).c_str());
+    // }
+    expression();
+    consume(TOKEN_EOF, "missing an EOF token");
+
+    return chunk_;
 }
 
-auto Scanner::emitErrorToken(const std::string &message) -> std::unique_ptr<Token> {
-    return std::make_unique<ErrorToken>(TOKEN_ERROR, start_, current_ - start_, line_, message);
+void Compiler::emitByte(uint8_t byte, int lineNo) {
+    // TODO: replace line number
+    printf("emiting byte: %d\n", byte);
+    chunk_.addCode(byte, lineNo);
 }
 
-auto Scanner::scanString() -> std::unique_ptr<Token> {
-    while (hasNext() && !match('"')) {
-        advance();
-    }
-    if (!hasNext()) {
-        return emitErrorToken("unterminated string");
-    } else {
-        advance();
-        return emitToken(TOKEN_STRING);
-    }
+void Compiler::emitBytes(uint8_t b1, uint8_t b2, int lineNo) {
+    // TODO: replace line number
+    chunk_.addCode(b1, lineNo);
+    chunk_.addCode(b2, lineNo);
 }
 
-auto Scanner::scanNumber() -> std::unique_ptr<Token> {
-    while (isdigit(peek())) {
-        advance();
-    }
-    if (match('.') && isdigit(peekNext())) {
-        advance();
-        while (isdigit(peek())) {
-            advance();
-        }
-    }
-    return emitToken(TOKEN_NUMBER);
+void Compiler::emitConstant(Value value, int lineNo) {
+    printf("emiting constant: %lf\n", value);
+
+    int idx = chunk_.addConstant(value);
+    emitBytes(OP_CONSTANT, idx, lineNo);
 }
 
-auto Scanner::scanIdentifier() -> std::unique_ptr<Token> {
-    while (isalpha(peek()) || isdigit(peek())) {
-        advance();
+auto Compiler::match(TokenType t) -> bool {
+    if (current_ == tokens_.size()) {
+        return false;
     }
-
-    auto word = source_.substr(start_, current_);
-    if (reservedWords.find(word) != reservedWords.end()) {
-        return emitToken(reservedWords[word]);
-    } else {
-        return emitToken(TOKEN_IDENTIFIER);
-    }
+    return tokens_[current_]->type_ == t;
 }
 
-auto Scanner::advance() -> char {
-    current_++;
-    return source_[current_ - 1];
+auto Compiler::advance() -> const Token * {
+    return tokens_[current_++].get();
 }
 
-auto Scanner::advanceIfMatch(char r) -> bool {
-    if (match(r)) {
-        advance();
+auto Compiler::advanceIfMatch(TokenType t) -> bool {
+    if (match(t)) {
+        current_++;
         return true;
     }
     return false;
 }
 
-auto Scanner::peek() -> char {
-    if (!hasNext()) return '\0';
-    return source_[current_];
+void Compiler::consume(TokenType t, std::string &&message) {
+    if (!advanceIfMatch(t)) {
+        throw CompilerException{std::move(message)};
+    }
 }
 
-auto Scanner::peekNext() -> char {
-    if (current_ + 1 >= source_.size()) return '\0';
-    return source_[current_ + 1];
+auto Compiler::hasNext() -> bool {
+    return current_ < tokens_.size();
 }
 
-auto Scanner::match(char r) -> bool {
-    return hasNext() && source_[current_] == r;
+auto Compiler::current() -> const Token * {
+    return tokens_[current_].get();
 }
 
-auto Scanner::hasNext() -> bool {
-    return current_ + 1 < source_.length();
+auto Compiler::previous() -> const Token * {
+    return tokens_[current_ - 1].get();
+}
+
+void Compiler::parsePrecedence(Precedence p) {
+    std::ostringstream oss;
+
+    auto prefixToken = advance();
+
+    if (parserRules_.find(prefixToken->type_) == parserRules_.end()) {
+        oss << "token " << prefixToken->type_ << " has no parser rule";
+        throw CompilerException{oss.str()};
+    }
+    auto rule = parserRules_[prefixToken->type_];
+
+    // First consider a token as a prefix operator and compiles a prefix expression.
+    // Each token is a prefix operator of itself
+    (this->*(rule.prefix))();
+
+    // Then check if this prefix expresison is an operand of an infix expression.
+    while (hasNext()) {
+        auto infixToken = current();
+        if (parserRules_.find(infixToken->type_) == parserRules_.end()) {
+            oss << "token type: " << infixToken->type_ << " has no parser rule";
+            throw CompilerException{oss.str()};
+        }
+        auto rule = parserRules_[infixToken->type_];
+        if (p > rule.precedence) {
+            break;
+        }
+        // Only advance to next token after making this infix token can be consumed
+        advance();
+        (this->*(rule.infix))();
+    }
+}
+
+void Compiler::expression() {
+    parsePrecedence(PREC_ASSIGNMENT);
+}
+
+void Compiler::binary() {
+    // The left operand is compiled and binary operator is consumed
+    auto token = previous();
+    auto rule = parserRules_[token->type_];
+
+    // Compile the right operand. These binary operators are all left-associative,
+    // i.e. 2 + 3 + 4 === ((2 + 3) + 4)
+    parsePrecedence((Precedence)((int)rule.precedence + 1));
+
+    switch (token->type_) {
+        case TOKEN_PLUS:
+            emitByte(OP_ADD, token->lineNo_);
+            break;
+        case TOKEN_MINUS:
+            emitByte(OP_SUBTRACT, token->lineNo_);
+            break;
+        case TOKEN_STAR:
+            emitByte(OP_MULTIPLY, token->lineNo_);
+            break;
+        case TOKEN_SLASH:
+            emitByte(OP_DIVIDE, token->lineNo_);
+            break;
+        default:
+            break;
+    }
+}
+
+void Compiler::unary() {
+    auto token = previous();
+    parsePrecedence(PREC_UNARY);
+
+    switch (token->type_) {
+        case TOKEN_MINUS:
+            emitByte(OP_NEGATE, token->lineNo_);
+            break;
+        default:
+            break;
+    }
+}
+
+void Compiler::grouping() {
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "grouping expr missing ')'");
+}
+
+void Compiler::number() {
+    auto token = previous();
+    Value value = std::stod(source_.substr(token->start_, token->length_));
+    emitConstant(value, token->lineNo_);
 }

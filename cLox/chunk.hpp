@@ -4,7 +4,7 @@
 #include <vector>
 
 // For now, only support double precision for constant value
-typedef double Value;
+using Value = double;
 
 /*
 Bytecode format:
