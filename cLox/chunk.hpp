@@ -4,23 +4,14 @@
 #include "value.hpp"
 #include <vector>
 
-/*
-Bytecode format:
-    OP_CONSTANT const_idx
-    OP_NEGATE
-    OP_RETURN
-    OP_ADD
-    OP_SUBTRACT
-    OP_MULTIPLY
-    OP_DIVIDE
-*/
 enum OpCode {
-    OP_CONSTANT,
+    OP_CONSTANT,  // OP_CONSTANT const_idx
     OP_ADD,
     OP_SUBTRACT,
     OP_MULTIPLY,
     OP_DIVIDE,
     OP_NEGATE,
+    OP_NOT,
     OP_RETURN,
 };
 

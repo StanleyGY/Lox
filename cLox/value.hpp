@@ -1,6 +1,9 @@
 #ifndef VALUE_H
 #define VALUE_H
 
+#include <string>
+#include <stdio.h>
+
 enum ValueType {
     VAL_NUMBER,
     VAL_BOOL,
@@ -27,6 +30,15 @@ class Value {
     }
     auto asBool() const -> bool {
         return as_.boolean;
+    }
+    void print() const {
+        if (isNumber()) {
+            printf("%g", asNumber());
+        } else if (isBool()) {
+            printf(asBool() ? "true" : "false");
+        } else {
+            printf("nil");
+        }
     }
 
     ValueType type_;

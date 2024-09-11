@@ -3,8 +3,7 @@
 #include "vm.hpp"
 #include <iostream>
 
-int main(int argc, const char *argv[]) {
-    std::string source = "(-1 + 2) * 3 - -4 + true";
+void compileAndRun(const std::string &test, const std::string &source) {
     Compiler compiler{source};
     Chunk chunk;
     try {
@@ -12,5 +11,13 @@ int main(int argc, const char *argv[]) {
     } catch (const std::exception &e) {
         std::cout << e.what() << std::endl;
     }
-    chunk.disassemble("testing");
+    chunk.disassemble(test);
+
+    VM vm{&chunk};
+    vm.interpret();
+}
+
+int main(int argc, const char *argv[]) {
+    compileAndRun("unary/binary arithmetic", "(-1 + 2) * 3 - -4");
+    compileAndRun("logical", "!true");
 }

@@ -16,6 +16,7 @@ Compiler::Compiler(const std::string &source) : source_(source), scanner_(Scanne
         {TOKEN_TRUE, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_FALSE, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_NIL, {&Compiler::literal, nullptr, PREC_NONE}},
+        {TOKEN_BANG, {&Compiler::unary, nullptr, PREC_UNARY}},
         {TOKEN_EOF, {nullptr, nullptr, PREC_NONE}},
     };
 }
@@ -138,6 +139,9 @@ void Compiler::unary() {
     switch (opType) {
         case TOKEN_MINUS:
             emitByte(OP_NEGATE, opLineNo);
+            break;
+        case TOKEN_BANG:
+            emitByte(OP_NOT, opLineNo);
             break;
         default:
             break;

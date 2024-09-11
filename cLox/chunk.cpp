@@ -31,6 +31,8 @@ auto Chunk::disassembleInstruction(int offset) const -> int {
             return disassembleConstantInstruction("OP_CONSTANT", offset);
         case OP_NEGATE:
             return disassembleSimpleInstruction("OP_NEGATE", offset);
+        case OP_NOT:
+            return disassembleSimpleInstruction("OP_NOT", offset);
         case OP_RETURN:
             return disassembleSimpleInstruction("OP_RETURN", offset);
         case OP_ADD:
@@ -53,13 +55,7 @@ auto Chunk::disassembleConstantInstruction(const std::string& name, int offset) 
     printf("%-16s %4d ", name.c_str(), idx);
 
     auto c = constants_[idx];
-    if (c.isNumber()) {
-        printf("%g", c.asNumber());
-    } else if (c.isBool()) {
-        printf(c.isBool() ? "true" : "false");
-    } else {
-        printf("nil");
-    }
+    c.print();
     printf("\n");
     return offset + 2;
 }

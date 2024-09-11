@@ -2,9 +2,12 @@
 #include "value.hpp"
 #include <iostream>
 
+static auto isFalsey(Value v) -> bool {
+    return v.isNil() || (v.isBool() && !v.asBool()) || (v.isNumber() && v.asNumber() == 0);
+}
+
 auto VM::interpret() -> InterpretResult {
-    while (true) {
-        printStack();
+    while (ip_ < chunk_->code_.size()) {
         chunk_->disassembleInstruction(ip_);
 
         uint8_t instruction = readByte();
@@ -41,29 +44,33 @@ auto VM::interpret() -> InterpretResult {
             case OP_ADD: {
                 auto r = pop();
                 auto l = pop();
-                push(Value{l.asNumber() + r.asNumber()});
+                push(l.asNumber() + r.asNumber());
                 break;
             }
             case OP_SUBTRACT: {
                 auto r = pop();
                 auto l = pop();
-                push(Value{l.asNumber() - r.asNumber()});
+                push(l.asNumber() - r.asNumber());
                 break;
             }
             case OP_MULTIPLY: {
                 auto r = pop();
                 auto l = pop();
-                push(Value{l.asNumber() * r.asNumber()});
+                push(l.asNumber() * r.asNumber());
                 break;
             }
             case OP_DIVIDE: {
                 auto r = pop();
                 auto l = pop();
-                push(Value{l.asNumber() / r.asNumber()});
+                push(l.asNumber() / r.asNumber());
                 break;
             }
             case OP_NEGATE: {
-                push(Value{-pop().asNumber()});
+                push(-pop().asNumber());
+                break;
+            }
+            case OP_NOT: {
+                push(isFalsey(pop()));
                 break;
             }
             case OP_RETURN: {
@@ -71,6 +78,8 @@ auto VM::interpret() -> InterpretResult {
                 break;
             }
         }
+
+        printStack();
     }
     return INTERPRET_OK;
 }
@@ -99,9 +108,7 @@ void VM::printStack() {
     printf("          ");
     for (auto iter = stack_.begin(); iter != stack_.end(); iter++) {
         printf("[ ");
-        if ((*iter).isNumber()) {
-            printf("%g", (*iter).asNumber());
-        }
+        (*iter).print();
         printf(" ]");
     }
     printf("\n");
