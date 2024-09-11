@@ -25,6 +25,8 @@ auto VM::interpret() -> InterpretResult {
             case OP_SUBTRACT:
             case OP_MULTIPLY:
             case OP_DIVIDE:
+            case OP_GREATER:
+            case OP_LESS:
                 if (!peek(0).isNumber() || !peek(1).isNumber()) {
                     printRuntimeError("operand must be a number");
                     return INTERPRET_RUNTIME_ERROR;
@@ -63,6 +65,24 @@ auto VM::interpret() -> InterpretResult {
                 auto r = pop();
                 auto l = pop();
                 push(l.asNumber() / r.asNumber());
+                break;
+            }
+            case OP_GREATER: {
+                auto r = pop();
+                auto l = pop();
+                push(l.asNumber() > r.asNumber());
+                break;
+            }
+            case OP_LESS: {
+                auto r = pop();
+                auto l = pop();
+                push(l.asNumber() < r.asNumber());
+                break;
+            }
+            case OP_EQUAL: {
+                auto r = pop();
+                auto l = pop();
+                push(l.asNumber() == r.asNumber());
                 break;
             }
             case OP_NEGATE: {

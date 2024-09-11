@@ -4,12 +4,12 @@
 #include <iostream>
 
 void compileAndRun(const std::string &test, const std::string &source) {
-    Compiler compiler{source};
     Chunk chunk;
     try {
+        Compiler compiler{source};
         chunk = compiler.compile();
-    } catch (const std::exception &e) {
-        std::cout << e.what() << std::endl;
+    } catch (std::exception &e) {
+        std::cerr << e.what() << std::endl;
     }
     chunk.disassemble(test);
 
@@ -19,5 +19,5 @@ void compileAndRun(const std::string &test, const std::string &source) {
 
 int main(int argc, const char *argv[]) {
     compileAndRun("unary/binary arithmetic", "(-1 + 2) * 3 - -4");
-    compileAndRun("logical", "!true");
+    compileAndRun("logical", "!(5 - 4 > 3 * 2 == !nil)");
 }

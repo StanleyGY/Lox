@@ -12,6 +12,12 @@ Compiler::Compiler(const std::string &source) : source_(source), scanner_(Scanne
         {TOKEN_PLUS, {nullptr, &Compiler::binary, PREC_TERM}},
         {TOKEN_STAR, {nullptr, &Compiler::binary, PREC_FACTOR}},
         {TOKEN_SLASH, {nullptr, &Compiler::binary, PREC_FACTOR}},
+        {TOKEN_BANG_EQUAL, {nullptr, &Compiler::binary, PREC_EQUALITY}},
+        {TOKEN_EQUAL_EQUAL, {nullptr, &Compiler::binary, PREC_EQUALITY}},
+        {TOKEN_LESS, {nullptr, &Compiler::binary, PREC_COMPARISON}},
+        {TOKEN_LESS_EQUAL, {nullptr, &Compiler::binary, PREC_COMPARISON}},
+        {TOKEN_GREATER, {nullptr, &Compiler::binary, PREC_COMPARISON}},
+        {TOKEN_GREATER_EQUAL, {nullptr, &Compiler::binary, PREC_COMPARISON}},
         {TOKEN_NUMBER, {&Compiler::number, nullptr, PREC_NONE}},
         {TOKEN_TRUE, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_FALSE, {&Compiler::literal, nullptr, PREC_NONE}},
@@ -125,6 +131,27 @@ void Compiler::binary() {
             break;
         case TOKEN_SLASH:
             emitByte(OP_DIVIDE, opLineNo);
+            break;
+        case TOKEN_BANG_EQUAL:
+            // a != b is equiv to !(a == b)
+            emitBytes(OP_EQUAL, OP_NOT, opLineNo);
+            break;
+        case TOKEN_EQUAL_EQUAL:
+            emitByte(OP_EQUAL, opLineNo);
+            break;
+        case TOKEN_LESS_EQUAL:
+            // a <= b is equiv to !(a > b)
+            emitBytes(OP_GREATER, OP_NOT, opLineNo);
+            break;
+        case TOKEN_LESS:
+            emitByte(OP_LESS, opLineNo);
+            break;
+        case TOKEN_GREATER_EQUAL:
+            // a >= b is equiv to !(a < b)
+            emitBytes(OP_LESS, OP_NOT, opLineNo);
+            break;
+        case TOKEN_GREATER:
+            emitByte(OP_GREATER, opLineNo);
             break;
         default:
             break;

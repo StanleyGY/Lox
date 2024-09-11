@@ -10,8 +10,7 @@ enum ValueType {
     VAL_NIL,
 };
 
-class Value {
-   public:
+struct Value {
     Value() : type_{VAL_NIL} {}
     Value(double v) : type_{VAL_NUMBER} { as_.number = v; };
     Value(bool v) : type_{VAL_BOOL} { as_.boolean = v; };

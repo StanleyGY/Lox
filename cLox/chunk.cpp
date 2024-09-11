@@ -43,6 +43,12 @@ auto Chunk::disassembleInstruction(int offset) const -> int {
             return disassembleSimpleInstruction("OP_MULTIPLY", offset);
         case OP_DIVIDE:
             return disassembleSimpleInstruction("OP_DIVIDE", offset);
+        case OP_EQUAL:
+            return disassembleSimpleInstruction("OP_EQUAL", offset);
+        case OP_GREATER:
+            return disassembleSimpleInstruction("OP_GREATER", offset);
+        case OP_LESS:
+            return disassembleSimpleInstruction("OP_LESS", offset);
         default:
             printf("unknown opcode: %d", instr);
             return offset + 1;
