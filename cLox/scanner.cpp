@@ -116,6 +116,10 @@ auto Scanner::emitToken(TokenType type) -> std::unique_ptr<Token> {
     return std::make_unique<Token>(type, start_, current_ - start_, line_);
 }
 
+auto Scanner::emitToken(TokenType type, int s, int e) -> std::unique_ptr<Token> {
+    return std::make_unique<Token>(type, s, e - s, line_);
+}
+
 auto Scanner::emitErrorToken(const std::string &message) -> std::unique_ptr<Token> {
     return std::make_unique<ErrorToken>(TOKEN_ERROR, start_, current_ - start_, line_, message);
 }
@@ -126,7 +130,7 @@ auto Scanner::scanString() -> std::unique_ptr<Token> {
     }
     if (hasNext()) {
         advance();
-        return emitToken(TOKEN_STRING);
+        return emitToken(TOKEN_STRING, start_ + 1, current_ - 1);
     }
     return emitErrorToken("unterminated string");
 }

@@ -19,6 +19,7 @@ Compiler::Compiler(const std::string &source) : source_(source), scanner_(Scanne
         {TOKEN_GREATER, {nullptr, &Compiler::binary, PREC_COMPARISON}},
         {TOKEN_GREATER_EQUAL, {nullptr, &Compiler::binary, PREC_COMPARISON}},
         {TOKEN_NUMBER, {&Compiler::number, nullptr, PREC_NONE}},
+        {TOKEN_STRING, {&Compiler::string, nullptr, PREC_NONE}},
         {TOKEN_TRUE, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_FALSE, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_NIL, {&Compiler::literal, nullptr, PREC_NONE}},
@@ -184,7 +185,12 @@ void Compiler::number() {
     double value = std::stod(source_.substr(prevToken_->start_, prevToken_->length_));
     // Store the number constant in a separate constant_ array because
     // number cosntants can have billions of variants
-    emitConstant(Value{value}, prevToken_->lineNo_);
+    emitConstant(value, prevToken_->lineNo_);
+}
+
+void Compiler::string() {
+    auto value = source_.substr(prevToken_->start_, prevToken_->length_);
+    emitConstant(value, prevToken_->lineNo_);
 }
 
 void Compiler::literal() {
@@ -193,10 +199,10 @@ void Compiler::literal() {
     // is to emit a bytecode instruction.
     switch (prevToken_->type_) {
         case TOKEN_TRUE:
-            emitConstant(Value{true}, prevToken_->lineNo_);
+            emitConstant(true, prevToken_->lineNo_);
             break;
         case TOKEN_FALSE:
-            emitConstant(Value{false}, prevToken_->lineNo_);
+            emitConstant(false, prevToken_->lineNo_);
             break;
         case TOKEN_NIL:
             emitConstant(Value{}, prevToken_->lineNo_);

@@ -22,6 +22,12 @@ auto VM::interpret() -> InterpretResult {
                 break;
             }
             case OP_ADD:
+                if (
+                    !(peek(0).isNumber() && peek(1).isNumber()) && !(peek(0).isString() && peek(1).isString())) {
+                    printRuntimeError("operand must be a number or a string");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
             case OP_SUBTRACT:
             case OP_MULTIPLY:
             case OP_DIVIDE:
@@ -46,7 +52,11 @@ auto VM::interpret() -> InterpretResult {
             case OP_ADD: {
                 auto r = pop();
                 auto l = pop();
-                push(l.asNumber() + r.asNumber());
+                if (l.isNumber()) {
+                    push(l.asNumber() + r.asNumber());
+                } else {
+                    push(l.asString() + r.asString());
+                }
                 break;
             }
             case OP_SUBTRACT: {
@@ -82,7 +92,7 @@ auto VM::interpret() -> InterpretResult {
             case OP_EQUAL: {
                 auto r = pop();
                 auto l = pop();
-                push(l.asNumber() == r.asNumber());
+                push(l == r);
                 break;
             }
             case OP_NEGATE: {

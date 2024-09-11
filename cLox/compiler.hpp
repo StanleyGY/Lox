@@ -58,6 +58,7 @@ class Compiler {
     void unary();
     void grouping();
     void number();
+    void string();
     void literal();
 
     using ParseFunc = void (Compiler::*)();

@@ -18,6 +18,7 @@ class Scanner {
 
    private:
     auto emitToken(TokenType type) -> std::unique_ptr<Token>;
+    auto emitToken(TokenType type, int s, int e) -> std::unique_ptr<Token>;
     auto emitErrorToken(const std::string &message) -> std::unique_ptr<Token>;
 
     auto scanString() -> std::unique_ptr<Token>;

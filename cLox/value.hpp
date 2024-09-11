@@ -2,49 +2,35 @@
 #define VALUE_H
 
 #include <string>
-#include <stdio.h>
+#include <variant>
 
 enum ValueType {
     VAL_NUMBER,
     VAL_BOOL,
     VAL_NIL,
+    VAL_STRING,
 };
 
-struct Value {
-    Value() : type_{VAL_NIL} {}
-    Value(double v) : type_{VAL_NUMBER} { as_.number = v; };
-    Value(bool v) : type_{VAL_BOOL} { as_.boolean = v; };
+class Value {
+   public:
+    Value();
+    Value(double v);
+    Value(bool v);
+    Value(std::string v);
 
-    auto isNumber() const -> bool {
-        return type_ == VAL_NUMBER;
-    }
-    auto isBool() const -> bool {
-        return type_ == VAL_BOOL;
-    }
-    auto isNil() const -> bool {
-        return type_ == VAL_NIL;
-    }
-    auto asNumber() const -> double {
-        return as_.number;
-    }
-    auto asBool() const -> bool {
-        return as_.boolean;
-    }
-    void print() const {
-        if (isNumber()) {
-            printf("%g", asNumber());
-        } else if (isBool()) {
-            printf(asBool() ? "true" : "false");
-        } else {
-            printf("nil");
-        }
-    }
+    auto operator==(const Value &other) const -> bool;
+
+    auto isNumber() const -> bool;
+    auto isBool() const -> bool;
+    auto isNil() const -> bool;
+    auto isString() const -> bool;
+    auto asNumber() const -> double;
+    auto asBool() const -> bool;
+    auto asString() const -> std::string;
+    void print() const;
 
     ValueType type_;
-    union {
-        bool boolean;
-        double number;
-    } as_;
+    std::variant<bool, double, std::string> as_;
 };
 
 #endif
