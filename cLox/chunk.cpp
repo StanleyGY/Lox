@@ -1,5 +1,6 @@
 #include "chunk.hpp"
 #include <iostream>
+#include <map>
 #include <format>
 
 void Chunk::addCode(uint8_t byte, int lineNo) {
@@ -8,6 +9,7 @@ void Chunk::addCode(uint8_t byte, int lineNo) {
 }
 
 auto Chunk::addConstant(Value value) -> int {
+    // TODO: can de-duplicate the constant
     constants_.emplace_back(value);
     return constants_.size() - 1;
 }
@@ -32,6 +34,10 @@ auto Chunk::disassembleInstruction(int offset) const -> int {
     switch (instr) {
         case OP_CONSTANT:
             return disassembleConstantInstruction("OP_CONSTANT", offset);
+        case OP_DEFINE_VAR:
+            return disassembleConstantInstruction("OP_DEFINE_VAR", offset);
+        case OP_GET_VAR:
+            return disassembleConstantInstruction("OP_GET_VAR", offset);
         case OP_NEGATE:
             return disassembleSimpleInstruction("OP_NEGATE", offset);
         case OP_NOT:
@@ -54,6 +60,8 @@ auto Chunk::disassembleInstruction(int offset) const -> int {
             return disassembleSimpleInstruction("OP_LESS", offset);
         case OP_PRINT:
             return disassembleSimpleInstruction("OP_PRINT", offset);
+        case OP_POP:
+            return disassembleSimpleInstruction("OP_POP", offset);
         default:
             std::cout << "unknown opcode: " << instr;
             return offset + 1;

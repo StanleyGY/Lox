@@ -18,7 +18,8 @@ void compileAndRun(const std::string &test, const std::string &source) {
 }
 
 int main(int argc, const char *argv[]) {
-    compileAndRun("unary/binary arithmetic", "(-1 + 2) * 3 - -4");
-    compileAndRun("logical", "!(5 - 4 > 3 * 2 == !nil)");
-    compileAndRun("string", "\"str\" + \"ing\" == \"string\"");
+    // compileAndRun("unary/binary arithmetic", "(-1 + 2) * 3 - -4");
+    // compileAndRun("logical", "!(5 - 4 > 3 * 2 == !nil)");
+    // compileAndRun("string", "\"str\" + \"ing\" == \"string\"");
+    compileAndRun("print", "print 1;");
 }

@@ -67,6 +67,7 @@ class Compiler {
     void number();
     void string();
     void literal();
+    void variable();
 
     using ParseFunc = void (Compiler::*)();
 

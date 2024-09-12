@@ -6,6 +6,10 @@ static auto isFalsey(Value v) -> bool {
     return v.isNil() || (v.isBool() && !v.asBool()) || (v.isNumber() && v.asNumber() == 0);
 }
 
+VM::VM(const Chunk *chunk) : chunk_{chunk} {
+    ip_ = 0;
+}
+
 auto VM::interpret() -> InterpretResult {
     while (ip_ < chunk_->code_.size()) {
         chunk_->disassembleInstruction(ip_);
@@ -101,6 +105,21 @@ auto VM::interpret() -> InterpretResult {
             }
             case OP_NOT: {
                 push(isFalsey(pop()));
+                break;
+            }
+            case OP_DEFINE_VAR: {
+                auto val = pop();
+                auto name = chunk_->constants_[readByte()];
+                globals_.insert({name.asString(), val});
+                break;
+            }
+            case OP_GET_VAR: {
+                auto name = chunk_->constants_[readByte()];
+                if (globals_.find(name.asString()) == globals_.end()) {
+                    printRuntimeError("reference an undefined variable");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                push(globals_[name.asString()]);
                 break;
             }
             case OP_PRINT: {

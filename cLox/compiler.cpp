@@ -8,6 +8,7 @@ Compiler::Compiler(const std::string &source) : source_(source), scanner_(Scanne
     parserRules_ = std::map<TokenType, Rule>{
         {TOKEN_LEFT_PAREN, {&Compiler::grouping, nullptr, PREC_NONE}},
         {TOKEN_RIGHT_PAREN, {nullptr, nullptr, PREC_NONE}},
+        {TOKEN_SEMICOLON, {nullptr, nullptr, PREC_NONE}},
         {TOKEN_MINUS, {&Compiler::unary, &Compiler::binary, PREC_TERM}},
         {TOKEN_PLUS, {nullptr, &Compiler::binary, PREC_TERM}},
         {TOKEN_STAR, {nullptr, &Compiler::binary, PREC_FACTOR}},
@@ -18,12 +19,13 @@ Compiler::Compiler(const std::string &source) : source_(source), scanner_(Scanne
         {TOKEN_LESS_EQUAL, {nullptr, &Compiler::binary, PREC_COMPARISON}},
         {TOKEN_GREATER, {nullptr, &Compiler::binary, PREC_COMPARISON}},
         {TOKEN_GREATER_EQUAL, {nullptr, &Compiler::binary, PREC_COMPARISON}},
+        {TOKEN_BANG, {&Compiler::unary, nullptr, PREC_UNARY}},
         {TOKEN_NUMBER, {&Compiler::number, nullptr, PREC_NONE}},
         {TOKEN_STRING, {&Compiler::string, nullptr, PREC_NONE}},
         {TOKEN_TRUE, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_FALSE, {&Compiler::literal, nullptr, PREC_NONE}},
         {TOKEN_NIL, {&Compiler::literal, nullptr, PREC_NONE}},
-        {TOKEN_BANG, {&Compiler::unary, nullptr, PREC_UNARY}},
+        {TOKEN_IDENTIFIER, {&Compiler::variable, nullptr, PREC_NONE}},
         {TOKEN_EOF, {nullptr, nullptr, PREC_NONE}},
     };
 }
@@ -112,19 +114,29 @@ void Compiler::parsePrecedence(Precedence p) {
 }
 
 void Compiler::declaration() {
-    // if (advanceIfMatch(TOKEN_VAR)) {
-    //     varDecl();
-    // } else {
-    //     statement();
-    // }
-    statement();
+    if (advanceIfMatch(TOKEN_VAR)) {
+        varDecl();
+    } else {
+        statement();
+    }
 }
 
 void Compiler::varDecl() {
-    // if (advanceIfMatch(TOKEN_EQUAL)) {
-    //     // initializer
-    // }
-    // consume(TOKEN_SEMICOLON, "variable declaration missing a ';'");
+    // Parse variable name as a constant
+    consume(TOKEN_IDENTIFIER, "variable declaration missing identifier");
+
+    // A variable name could be too long to emit a constant into VM stack_
+    // At runtime, VM will read from chunk_.constants_ directly
+    int idx = chunk_.addConstant(source_.substr(prevToken_->start_, prevToken_->length_));
+
+    if (advanceIfMatch(TOKEN_EQUAL)) {
+        // Parse initializer expr
+        expression();
+    } else {
+        emitConstant(Value{}, prevToken_->lineNo_);
+    }
+    consume(TOKEN_SEMICOLON, "variable declaration missing a ';'");
+    emitBytes(OP_DEFINE_VAR, idx, prevToken_->lineNo_);
 }
 
 void Compiler::statement() {
@@ -253,4 +265,10 @@ void Compiler::literal() {
         default:
             throw CompilerException{"processing literal for invalid token"};
     }
+}
+
+void Compiler::variable() {
+    auto name = source_.substr(prevToken_->start_, prevToken_->length_);
+    int idx = chunk_.addConstant(name);
+    emitBytes(OP_GET_VAR, idx, prevToken_->lineNo_);
 }
