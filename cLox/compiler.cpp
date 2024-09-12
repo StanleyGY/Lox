@@ -29,8 +29,13 @@ Compiler::Compiler(const std::string &source) : source_(source), scanner_(Scanne
 }
 
 auto Compiler::compile() -> Chunk {
+    // This causes the first token to be stored in `currToken_`
     advance();
-    expression();
+
+    while (currToken_->type_ != TOKEN_EOF) {
+        declaration();
+    }
+
     consume(TOKEN_EOF, "missing an EOF token");
     return chunk_;
 }
@@ -104,6 +109,44 @@ void Compiler::parsePrecedence(Precedence p) {
         advance();
         (this->*(rule.infix))();
     }
+}
+
+void Compiler::declaration() {
+    // if (advanceIfMatch(TOKEN_VAR)) {
+    //     varDecl();
+    // } else {
+    //     statement();
+    // }
+    statement();
+}
+
+void Compiler::varDecl() {
+    // if (advanceIfMatch(TOKEN_EQUAL)) {
+    //     // initializer
+    // }
+    // consume(TOKEN_SEMICOLON, "variable declaration missing a ';'");
+}
+
+void Compiler::statement() {
+    if (advanceIfMatch(TOKEN_PRINT)) {
+        printStmt();
+    } else {
+        expressionStmt();
+    }
+}
+
+void Compiler::printStmt() {
+    auto lineNo = prevToken_->lineNo_;
+    expression();
+    consume(TOKEN_SEMICOLON, "statement missing a ';'");
+    emitByte(OP_PRINT, lineNo);
+}
+
+void Compiler::expressionStmt() {
+    auto lineNo = currToken_->lineNo_;
+    expression();
+    consume(TOKEN_SEMICOLON, "statement missing a ';'");
+    emitByte(OP_POP, lineNo);
 }
 
 void Compiler::expression() {

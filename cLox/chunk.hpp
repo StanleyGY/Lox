@@ -16,6 +16,8 @@ enum OpCode {
     OP_NEGATE,
     OP_NOT,
     OP_RETURN,
+    OP_PRINT,
+    OP_POP,
 };
 
 // A chunk is a sequence of bytecode

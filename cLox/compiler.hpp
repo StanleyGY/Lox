@@ -53,6 +53,13 @@ class Compiler {
     void emitConstant(Value value, int lineNo);
 
     void parsePrecedence(Precedence p);
+
+    void declaration();
+    void varDecl();
+    void statement();
+    void printStmt();
+    void expressionStmt();
+
     void expression();
     void binary();
     void unary();
@@ -77,8 +84,6 @@ class Compiler {
     std::unique_ptr<Token> currToken_;
 
     Chunk chunk_;
-    // int current_;
-    // std::vector<std::unique_ptr<Token>> tokens_;
 };
 
 #endif

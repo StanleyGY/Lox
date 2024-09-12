@@ -18,8 +18,7 @@ class Value {
     Value(bool v);
     Value(std::string v);
 
-    auto operator==(const Value &other) const -> bool;
-
+    auto operator==(const Value& other) const -> bool;
     auto isNumber() const -> bool;
     auto isBool() const -> bool;
     auto isNil() const -> bool;
@@ -27,7 +26,8 @@ class Value {
     auto asNumber() const -> double;
     auto asBool() const -> bool;
     auto asString() const -> std::string;
-    void print() const;
+
+    friend auto operator<<(std::ostream& oss, const Value& v) -> std::ostream&;
 
     ValueType type_;
     std::variant<bool, double, std::string> as_;

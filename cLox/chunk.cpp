@@ -1,4 +1,6 @@
 #include "chunk.hpp"
+#include <iostream>
+#include <format>
 
 void Chunk::addCode(uint8_t byte, int lineNo) {
     code_.emplace_back((OpCode)byte);
@@ -11,13 +13,14 @@ auto Chunk::addConstant(Value value) -> int {
 }
 
 void Chunk::disassemble(const std::string& name) const {
-    printf("== %s ==\n", name.c_str());
+    std::cout << "== " << name << " ==" << std::endl;
+
     for (int offset = 0; offset < code_.size();) {
-        printf("%04d ", offset);
+        std::cout << std::format("{0:04}", offset);
         if (offset > 0 && lines_[offset] == lines_[offset - 1]) {
-            printf("   | ");
+            std::cout << "   | ";
         } else {
-            printf("%4d ", lines_[offset]);
+            std::cout << std::format("{0:4} ", lines_[offset]);
         }
         offset = disassembleInstruction(offset);
     }
@@ -49,24 +52,23 @@ auto Chunk::disassembleInstruction(int offset) const -> int {
             return disassembleSimpleInstruction("OP_GREATER", offset);
         case OP_LESS:
             return disassembleSimpleInstruction("OP_LESS", offset);
+        case OP_PRINT:
+            return disassembleSimpleInstruction("OP_PRINT", offset);
         default:
-            printf("unknown opcode: %d", instr);
+            std::cout << "unknown opcode: " << instr;
             return offset + 1;
     }
-    printf("\n");
+    std::cout << std::endl;
 }
 
 auto Chunk::disassembleConstantInstruction(const std::string& name, int offset) const -> int {
     int idx = code_[offset + 1];
-    printf("%-16s %4d ", name.c_str(), idx);
-
     auto c = constants_[idx];
-    c.print();
-    printf("\n");
+    std::cout << std::format("{0:<16} {1:4} ", name, idx) << c << std::endl;
     return offset + 2;
 }
 
 auto Chunk::disassembleSimpleInstruction(const std::string& name, int offset) const -> int {
-    printf("%-16s\n", name.c_str());
+    std::cout << std::format("{0:<16}", name) << std::endl;
     return offset + 1;
 }

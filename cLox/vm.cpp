@@ -103,6 +103,11 @@ auto VM::interpret() -> InterpretResult {
                 push(isFalsey(pop()));
                 break;
             }
+            case OP_PRINT: {
+                std::cout << pop() << std::endl;
+                break;
+            }
+            case OP_POP:
             case OP_RETURN: {
                 pop();
                 break;
@@ -135,13 +140,11 @@ auto VM::pop() -> Value {
 }
 
 void VM::printStack() {
-    printf("          ");
+    std::cout << "          ";
     for (auto iter = stack_.begin(); iter != stack_.end(); iter++) {
-        printf("[ ");
-        (*iter).print();
-        printf(" ]");
+        std::cout << "[ " << (*iter) << " ]";
     }
-    printf("\n");
+    std::cout << std::endl;
 }
 
 void VM::printRuntimeError(const std::string &message) {
