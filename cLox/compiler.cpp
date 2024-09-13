@@ -94,8 +94,12 @@ void Compiler::parsePrecedence(Precedence p) {
     auto rule = parserRules_[prevToken_->type_];
 
     // First consider a token as a prefix operator and compiles a prefix expression.
-    // Each token is a prefix operator of itself
-    (this->*(rule.prefix))();
+    // Each token is a prefix operator of itself.
+
+    // The `variable` is a prefix functor, and following logic determines if
+    // its assignment logic should be executed within this prefix expression.
+    auto canAssign = rule.precedence < PREC_ASSIGNMENT;
+    (this->*(rule.prefix))(canAssign);
 
     // Then check if this prefix expresison is an operand of an infix expression.
     while (hasNext()) {
@@ -109,7 +113,7 @@ void Compiler::parsePrecedence(Precedence p) {
         }
         // Only advance to next token after ensuring this infix token can be consumed
         advance();
-        (this->*(rule.infix))();
+        (this->*(rule.infix))(canAssign);
     }
 }
 
@@ -131,7 +135,7 @@ void Compiler::varDecl() {
 
     if (advanceIfMatch(TOKEN_EQUAL)) {
         // Parse initializer expr
-        expression();
+        expression(true);
     } else {
         emitConstant(Value{}, prevToken_->lineNo_);
     }
@@ -149,23 +153,23 @@ void Compiler::statement() {
 
 void Compiler::printStmt() {
     auto lineNo = prevToken_->lineNo_;
-    expression();
+    expression(true);
     consume(TOKEN_SEMICOLON, "statement missing a ';'");
     emitByte(OP_PRINT, lineNo);
 }
 
 void Compiler::expressionStmt() {
     auto lineNo = currToken_->lineNo_;
-    expression();
+    expression(true);
     consume(TOKEN_SEMICOLON, "statement missing a ';'");
     emitByte(OP_POP, lineNo);
 }
 
-void Compiler::expression() {
+void Compiler::expression(bool canAssign) {
     parsePrecedence(PREC_ASSIGNMENT);
 }
 
-void Compiler::binary() {
+void Compiler::binary(bool canAssign) {
     // The left operand is compiled and binary operator is consumed
     auto opType = prevToken_->type_;
     auto opLineNo = prevToken_->lineNo_;
@@ -214,7 +218,7 @@ void Compiler::binary() {
     }
 }
 
-void Compiler::unary() {
+void Compiler::unary(bool canAssign) {
     auto opType = prevToken_->type_;
     auto opLineNo = prevToken_->lineNo_;
     parsePrecedence(PREC_UNARY);
@@ -231,24 +235,24 @@ void Compiler::unary() {
     }
 }
 
-void Compiler::grouping() {
-    expression();
+void Compiler::grouping(bool canAssign) {
+    expression(canAssign);
     consume(TOKEN_RIGHT_PAREN, "grouping expr missing ')'");
 }
 
-void Compiler::number() {
+void Compiler::number(bool canAssign) {
     double value = std::stod(source_.substr(prevToken_->start_, prevToken_->length_));
     // Store the number constant in a separate constant_ array because
     // number cosntants can have billions of variants
     emitConstant(value, prevToken_->lineNo_);
 }
 
-void Compiler::string() {
+void Compiler::string(bool canAssign) {
     auto value = source_.substr(prevToken_->start_, prevToken_->length_);
     emitConstant(value, prevToken_->lineNo_);
 }
 
-void Compiler::literal() {
+void Compiler::literal(bool canAssign) {
     // Technically, we can save execution time and space by not storing
     // these literals in a separate constant_ array. So a more optimal solution
     // is to emit a bytecode instruction.
@@ -267,8 +271,16 @@ void Compiler::literal() {
     }
 }
 
-void Compiler::variable() {
+void Compiler::variable(bool canAssign) {
     auto name = source_.substr(prevToken_->start_, prevToken_->length_);
     int idx = chunk_.addConstant(name);
-    emitBytes(OP_GET_VAR, idx, prevToken_->lineNo_);
+
+    // Note that we don't make "=" into an infix expression because otherwise
+    // when "=" shows up, it will emit an OP_GET_VAR token
+    if (canAssign && advanceIfMatch(TOKEN_EQUAL)) {
+        expression(canAssign);
+        emitBytes(OP_SET_VAR, idx, prevToken_->lineNo_);
+    } else {
+        emitBytes(OP_GET_VAR, idx, prevToken_->lineNo_);
+    }
 }

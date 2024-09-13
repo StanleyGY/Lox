@@ -60,16 +60,16 @@ class Compiler {
     void printStmt();
     void expressionStmt();
 
-    void expression();
-    void binary();
-    void unary();
-    void grouping();
-    void number();
-    void string();
-    void literal();
-    void variable();
+    void expression(bool canAssign);
+    void binary(bool canAssign);
+    void unary(bool canAssign);
+    void grouping(bool canAssign);
+    void number(bool canAssign);
+    void string(bool canAssign);
+    void literal(bool canAssign);
+    void variable(bool canAssign);
 
-    using ParseFunc = void (Compiler::*)();
+    using ParseFunc = void (Compiler::*)(bool);
 
     struct Rule {
         ParseFunc prefix;

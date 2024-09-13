@@ -115,11 +115,24 @@ auto VM::interpret() -> InterpretResult {
             }
             case OP_GET_VAR: {
                 auto name = chunk_->constants_[readByte()];
+                if (!name.isString()) {
+                    printRuntimeError("an assignment target must be an identifier");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
                 if (globals_.find(name.asString()) == globals_.end()) {
                     printRuntimeError("reference an undefined variable");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 push(globals_[name.asString()]);
+                break;
+            }
+            case OP_SET_VAR: {
+                auto name = chunk_->constants_[readByte()];
+                if (globals_.find(name.asString()) == globals_.end()) {
+                    printRuntimeError("set an undefined variable");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                globals_[name.asString()] = peek(0);
                 break;
             }
             case OP_PRINT: {

@@ -38,6 +38,8 @@ auto Chunk::disassembleInstruction(int offset) const -> int {
             return disassembleConstantInstruction("OP_DEFINE_VAR", offset);
         case OP_GET_VAR:
             return disassembleConstantInstruction("OP_GET_VAR", offset);
+        case OP_SET_VAR:
+            return disassembleConstantInstruction("OP_SET_VAR", offset);
         case OP_NEGATE:
             return disassembleSimpleInstruction("OP_NEGATE", offset);
         case OP_NOT:

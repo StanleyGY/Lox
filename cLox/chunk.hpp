@@ -19,6 +19,7 @@ enum OpCode {
     OP_PRINT,
     OP_DEFINE_VAR,
     OP_GET_VAR,
+    OP_SET_VAR,
     OP_POP,
 };
 

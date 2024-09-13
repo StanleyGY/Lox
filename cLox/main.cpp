@@ -8,7 +8,7 @@ void compileAndRun(const std::string &test, const std::string &source) {
     try {
         Compiler compiler{source};
         chunk = compiler.compile();
-    } catch (std::exception &e) {
+    } catch (const CompilerException &e) {
         std::cerr << e.what() << std::endl;
     }
     chunk.disassemble(test);
@@ -20,6 +20,10 @@ void compileAndRun(const std::string &test, const std::string &source) {
 int main(int argc, const char *argv[]) {
     // compileAndRun("unary/binary arithmetic", "(-1 + 2) * 3 - -4");
     // compileAndRun("logical", "!(5 - 4 > 3 * 2 == !nil)");
-    // compileAndRun("string", "\"str\" + \"ing\" == \"string\"");
-    compileAndRun("print", "print 1;");
+    compileAndRun(
+        "string",
+        "var breakfast = \"beignets\";"
+        "var beverage = \"cafe au lait\";"
+        "breakfast = \"beignets with \" + beverage;"
+        "print breakfast;");
 }
